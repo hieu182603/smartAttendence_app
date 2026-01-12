@@ -1,0 +1,948 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Platform,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
+import { EmployeeTabParamList } from '../../navigation/AppNavigator';
+import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
+import { Icon } from '../../components/Icon';
+import { DateTimePickerWrapper } from '../../components/DateTimePickerWrapper';
+
+type RequestsScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Requests'>;
+
+interface RequestsScreenProps {
+  navigation: RequestsScreenNavigationProp;
+}
+
+interface LeaveRequest {
+  id: number;
+  type: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedDate: string;
+  rejectionReason?: string;
+}
+
+export default function RequestsScreen({ navigation }: RequestsScreenProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [leaveType, setLeaveType] = useState('');
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date>(new Date());
+  const [reason, setReason] = useState('');
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showLeaveTypePicker, setShowLeaveTypePicker] = useState(false);
+
+  // Listen for navigation params to open create leave modal
+  useFocusEffect(
+    React.useCallback(() => {
+      // Get current route params
+      const state = navigation.getState();
+      const currentRoute = state?.routes[state?.index];
+      const params = currentRoute?.params as { openCreateModal?: boolean } | undefined;
+
+      if (params?.openCreateModal) {
+        setIsDialogOpen(true);
+        // Clear the param after opening
+        navigation.setParams({ openCreateModal: undefined } as any);
+      }
+    }, [navigation])
+  );
+
+  // Mock data matching web version
+  const leaveBalance = {
+    annual: 12,
+    sick: 5,
+    unpaid: 0,
+  };
+
+  const [requests, setRequests] = useState<LeaveRequest[]>([
+    {
+      id: 1,
+      type: 'Nghỉ phép năm',
+      startDate: '2026-01-15',
+      endDate: '2026-01-17',
+      reason: 'Nghỉ du lịch gia đình',
+      status: 'approved',
+      submittedDate: '2026-01-10',
+    },
+    {
+      id: 2,
+      type: 'Nghỉ ốm',
+      startDate: '2026-01-08',
+      endDate: '2026-01-08',
+      reason: 'Bị cảm nặng',
+      status: 'approved',
+      submittedDate: '2026-01-07',
+    },
+    {
+      id: 3,
+      type: 'Nghỉ phép năm',
+      startDate: '2026-01-20',
+      endDate: '2026-01-22',
+      reason: 'Việc cá nhân',
+      status: 'pending',
+      submittedDate: '2026-01-11',
+    },
+  ]);
+
+  const leaveTypes = [
+    'Nghỉ phép năm',
+    'Nghỉ ốm',
+    'Nghỉ không lương',
+    'Đăng ký tăng ca',
+  ];
+
+  const handleSubmitRequest = () => {
+    if (!leaveType || !reason) {
+      return;
+    }
+
+    const newRequest: LeaveRequest = {
+      id: requests.length + 1,
+      type: leaveType,
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+      reason,
+      status: 'pending',
+      submittedDate: new Date().toISOString().split('T')[0],
+    };
+
+    setRequests([newRequest, ...requests]);
+    setIsDialogOpen(false);
+    setLeaveType('');
+    setStartDate(new Date());
+    setEndDate(new Date());
+    setReason('');
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return (
+          <View
+            style={{
+              backgroundColor: 'rgba(34, 197, 94, 0.15)',
+              borderWidth: 1,
+              borderColor: 'rgba(34, 197, 94, 0.3)',
+              borderRadius: BORDER_RADIUS.sm,
+              paddingHorizontal: SPACING.sm,
+              paddingVertical: SPACING.xs / 2,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Icon name="check_circle" size={12} color={COLORS.accent.green} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '600',
+                color: COLORS.accent.green,
+                marginLeft: SPACING.xs / 2,
+              }}
+            >
+              Đã duyệt
+            </Text>
+          </View>
+        );
+      case 'rejected':
+        return (
+          <View
+            style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              borderWidth: 1,
+              borderColor: 'rgba(239, 68, 68, 0.3)',
+              borderRadius: BORDER_RADIUS.sm,
+              paddingHorizontal: SPACING.sm,
+              paddingVertical: SPACING.xs / 2,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Icon name="error" size={12} color={COLORS.accent.red} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '600',
+                color: COLORS.accent.red,
+                marginLeft: SPACING.xs / 2,
+              }}
+            >
+              Từ chối
+            </Text>
+          </View>
+        );
+      default:
+        return (
+          <View
+            style={{
+              backgroundColor: 'rgba(245, 158, 11, 0.15)',
+              borderWidth: 1,
+              borderColor: 'rgba(245, 158, 11, 0.3)',
+              borderRadius: BORDER_RADIUS.sm,
+              paddingHorizontal: SPACING.sm,
+              paddingVertical: SPACING.xs / 2,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Icon name="schedule" size={12} color={COLORS.accent.yellow} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '600',
+                color: COLORS.accent.yellow,
+                marginLeft: SPACING.xs / 2,
+              }}
+            >
+              Chờ duyệt
+            </Text>
+          </View>
+        );
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatDateForInput = (date: Date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  return (
+    <ScrollView
+      style={globalStyles.container}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 100 }}
+    >
+      {/* Header */}
+      <LinearGradient
+        colors={[COLORS.primary, COLORS.accent.cyan]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          paddingTop: SPACING.xxl * 2,
+          paddingBottom: SPACING.lg,
+          paddingHorizontal: SPACING.lg,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Background decoration */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: 256,
+            height: 256,
+            borderRadius: 128,
+            backgroundColor: 'rgba(34, 211, 238, 0.2)',
+          }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: 192,
+            height: 192,
+            borderRadius: 96,
+            backgroundColor: 'rgba(66, 69, 240, 0.3)',
+          }}
+        />
+
+        <View style={{ position: 'relative', zIndex: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: '600',
+                color: '#ffffff',
+                marginRight: SPACING.xs,
+              }}
+            >
+              Nghỉ phép & Đơn từ
+            </Text>
+            <Icon name="auto_awesome" size={20} color={COLORS.accent.cyan} />
+          </View>
+          <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>
+            Quản lý các đơn xin nghỉ
+          </Text>
+        </View>
+      </LinearGradient>
+
+      {/* Leave Balance */}
+      <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: SPACING.md,
+          }}
+        >
+          <Icon name="schedule" size={16} color={COLORS.primary} />
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: '600',
+              color: COLORS.text.primary,
+              marginLeft: SPACING.sm,
+            }}
+          >
+            Số ngày phép còn lại
+          </Text>
+        </View>
+        <View
+          style={{
+            backgroundColor: 'rgba(30, 41, 59, 0.6)',
+            borderRadius: BORDER_RADIUS.xl,
+            padding: SPACING.lg,
+            borderWidth: 1,
+            borderColor: 'rgba(148, 163, 184, 0.1)',
+            ...SHADOWS.lg,
+          }}
+        >
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            <View
+              style={{
+                flex: 1,
+                minWidth: '50%',
+                padding: SPACING.md,
+                borderRadius: BORDER_RADIUS.lg,
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                marginRight: SPACING.sm,
+                marginBottom: SPACING.sm,
+                borderWidth: 1,
+                borderColor: 'rgba(34, 197, 94, 0.2)',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: COLORS.text.secondary,
+                  marginBottom: SPACING.xs / 2,
+                }}
+              >
+                Phép năm
+              </Text>
+              <Text
+                style={{
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  color: COLORS.accent.green,
+                }}
+              >
+                {leaveBalance.annual}
+              </Text>
+              <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
+                ngày
+              </Text>
+            </View>
+            <View
+              style={{
+                flex: 1,
+                minWidth: '50%',
+                padding: SPACING.md,
+                borderRadius: BORDER_RADIUS.lg,
+                backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                marginBottom: SPACING.sm,
+                borderWidth: 1,
+                borderColor: 'rgba(34, 211, 238, 0.2)',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: COLORS.text.secondary,
+                  marginBottom: SPACING.xs / 2,
+                }}
+              >
+                Nghỉ ốm
+              </Text>
+              <Text
+                style={{
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  color: COLORS.accent.cyan,
+                }}
+              >
+                {leaveBalance.sick}
+              </Text>
+              <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
+                ngày
+              </Text>
+            </View>
+            <View
+              style={{
+                flex: 1,
+                minWidth: '50%',
+                padding: SPACING.md,
+                borderRadius: BORDER_RADIUS.lg,
+                backgroundColor: 'rgba(148, 163, 184, 0.1)',
+                marginRight: SPACING.sm,
+                borderWidth: 1,
+                borderColor: 'rgba(148, 163, 184, 0.2)',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: COLORS.text.secondary,
+                  marginBottom: SPACING.xs / 2,
+                }}
+              >
+                Không lương
+              </Text>
+              <Text
+                style={{
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  color: COLORS.text.secondary,
+                }}
+              >
+                {leaveBalance.unpaid}
+              </Text>
+              <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
+                ngày
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* New Request Button */}
+      <View style={{ paddingHorizontal: SPACING.lg, marginBottom: SPACING.lg }}>
+        <TouchableOpacity
+          onPress={() => setIsDialogOpen(true)}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={[COLORS.primary, COLORS.accent.cyan]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              borderRadius: BORDER_RADIUS.lg,
+              paddingVertical: SPACING.md,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              ...SHADOWS.md,
+            }}
+          >
+            <Icon name="add" size={20} color="#ffffff" />
+            <Text
+              style={{
+                color: '#ffffff',
+                fontSize: 16,
+                fontWeight: '600',
+                marginLeft: SPACING.sm,
+              }}
+            >
+              Tạo đơn xin nghỉ mới
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {/* Request History */}
+      <View style={{ paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: SPACING.md,
+          }}
+        >
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: COLORS.primary,
+              marginRight: SPACING.sm,
+            }}
+          />
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: '600',
+              color: COLORS.text.primary,
+            }}
+          >
+            Lịch sử đơn từ
+          </Text>
+        </View>
+        <View>
+          {requests.map((request) => (
+            <View
+              key={request.id}
+              style={{
+                backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                borderRadius: BORDER_RADIUS.lg,
+                padding: SPACING.md,
+                marginBottom: SPACING.md,
+                borderWidth: 1,
+                borderColor: 'rgba(148, 163, 184, 0.1)',
+                ...SHADOWS.md,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: SPACING.md,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '600',
+                      color: COLORS.text.primary,
+                      marginBottom: SPACING.xs / 2,
+                    }}
+                  >
+                    {request.type}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
+                    Gửi ngày {formatDate(request.submittedDate)}
+                  </Text>
+                </View>
+                {getStatusBadge(request.status)}
+              </View>
+
+              <View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: SPACING.sm,
+                    borderRadius: BORDER_RADIUS.md,
+                    backgroundColor: 'rgba(66, 69, 240, 0.05)',
+                    marginBottom: SPACING.sm,
+                  }}
+                >
+                  <Icon
+                    name="event"
+                    size={16}
+                    color={COLORS.text.secondary}
+                    style={{ marginRight: SPACING.sm }}
+                  />
+                  <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+                    {formatDate(request.startDate)} - {formatDate(request.endDate)}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    padding: SPACING.sm,
+                    borderRadius: BORDER_RADIUS.md,
+                    backgroundColor: 'rgba(34, 211, 238, 0.05)',
+                  }}
+                >
+                  <Icon
+                    name="assignment"
+                    size={16}
+                    color={COLORS.text.secondary}
+                    style={{ marginRight: SPACING.sm, marginTop: 2 }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: COLORS.text.secondary,
+                      flex: 1,
+                    }}
+                  >
+                    {request.reason}
+                  </Text>
+                </View>
+              </View>
+
+              {request.status === 'rejected' && request.rejectionReason && (
+                <View
+                  style={{
+                    marginTop: SPACING.md,
+                    padding: SPACING.md,
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderRadius: BORDER_RADIUS.md,
+                    borderWidth: 1,
+                    borderColor: 'rgba(239, 68, 68, 0.2)',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '500',
+                      color: COLORS.accent.red,
+                      marginBottom: SPACING.xs / 2,
+                    }}
+                  >
+                    Lý do từ chối:
+                  </Text>
+                  <Text style={{ fontSize: 11, color: COLORS.accent.red, opacity: 0.8 }}>
+                    {request.rejectionReason}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Create Leave Request Modal */}
+      <Modal
+        visible={isDialogOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsDialogOpen(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: COLORS.surface.dark,
+              borderTopLeftRadius: BORDER_RADIUS.xl,
+              borderTopRightRadius: BORDER_RADIUS.xl,
+              padding: SPACING.lg,
+              maxHeight: '90%',
+            }}
+          >
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: SPACING.lg,
+              }}
+            >
+              <View>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: '600',
+                    color: COLORS.text.primary,
+                    marginBottom: SPACING.xs / 2,
+                  }}
+                >
+                  Tạo đơn xin nghỉ
+                </Text>
+                <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+                  Điền thông tin đơn xin nghỉ của bạn
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsDialogOpen(false)}>
+                <Icon name="close" size={24} color={COLORS.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Leave Type */}
+              <View style={{ marginBottom: SPACING.lg }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '500',
+                    color: COLORS.text.primary,
+                    marginBottom: SPACING.sm,
+                  }}
+                >
+                  Loại đơn
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowLeaveTypePicker(true)}
+                  style={{
+                    backgroundColor: COLORS.surface.darker,
+                    borderRadius: BORDER_RADIUS.lg,
+                    borderWidth: 1,
+                    borderColor: 'rgba(148, 163, 184, 0.2)',
+                    paddingVertical: SPACING.md,
+                    paddingHorizontal: SPACING.md,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: leaveType ? COLORS.text.primary : COLORS.text.secondary,
+                      fontSize: 16,
+                    }}
+                  >
+                    {leaveType || 'Chọn loại đơn'}
+                  </Text>
+                  <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
+                </TouchableOpacity>
+
+                {/* Leave Type Picker Modal */}
+                <Modal
+                  visible={showLeaveTypePicker}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setShowLeaveTypePicker(false)}
+                >
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    activeOpacity={1}
+                    onPress={() => setShowLeaveTypePicker(false)}
+                  >
+                    <View
+                      style={{
+                        backgroundColor: COLORS.surface.dark,
+                        borderRadius: BORDER_RADIUS.xl,
+                        padding: SPACING.md,
+                        width: '80%',
+                        maxWidth: 400,
+                      }}
+                      onStartShouldSetResponder={() => true}
+                    >
+                      {leaveTypes.map((type) => (
+                        <TouchableOpacity
+                          key={type}
+                          onPress={() => {
+                            setLeaveType(type);
+                            setShowLeaveTypePicker(false);
+                          }}
+                          style={{
+                            padding: SPACING.md,
+                            borderRadius: BORDER_RADIUS.md,
+                            marginBottom: SPACING.xs,
+                            backgroundColor:
+                              leaveType === type
+                                ? 'rgba(66, 69, 240, 0.1)'
+                                : 'transparent',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color:
+                                leaveType === type
+                                  ? COLORS.primary
+                                  : COLORS.text.primary,
+                              fontSize: 16,
+                              fontWeight: leaveType === type ? '600' : '400',
+                            }}
+                          >
+                            {type}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
+              </View>
+
+              {/* Date Pickers */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  marginBottom: SPACING.lg,
+                }}
+              >
+                <View style={{ flex: 1, marginRight: SPACING.sm }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: COLORS.text.primary,
+                      marginBottom: SPACING.sm,
+                    }}
+                  >
+                    Từ ngày
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowStartDatePicker(true)}
+                    style={{
+                      backgroundColor: COLORS.surface.darker,
+                      borderRadius: BORDER_RADIUS.lg,
+                      borderWidth: 1,
+                      borderColor: 'rgba(148, 163, 184, 0.2)',
+                      paddingVertical: SPACING.md,
+                      paddingHorizontal: SPACING.md,
+                    }}
+                  >
+                    <Text style={{ color: COLORS.text.primary, fontSize: 16 }}>
+                      {formatDateForInput(startDate)}
+                    </Text>
+                  </TouchableOpacity>
+                  {showStartDatePicker && (
+                    <DateTimePickerWrapper
+                      value={startDate}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={(event: any, selectedDate?: Date) => {
+                        if (Platform.OS === 'android') {
+                          setShowStartDatePicker(false);
+                        }
+                        if (selectedDate) {
+                          setStartDate(selectedDate);
+                        }
+                      }}
+                    />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: COLORS.text.primary,
+                      marginBottom: SPACING.sm,
+                    }}
+                  >
+                    Đến ngày
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowEndDatePicker(true)}
+                    style={{
+                      backgroundColor: COLORS.surface.darker,
+                      borderRadius: BORDER_RADIUS.lg,
+                      borderWidth: 1,
+                      borderColor: 'rgba(148, 163, 184, 0.2)',
+                      paddingVertical: SPACING.md,
+                      paddingHorizontal: SPACING.md,
+                    }}
+                  >
+                    <Text style={{ color: COLORS.text.primary, fontSize: 16 }}>
+                      {formatDateForInput(endDate)}
+                    </Text>
+                  </TouchableOpacity>
+                  {showEndDatePicker && (
+                    <DateTimePickerWrapper
+                      value={endDate}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={(event: any, selectedDate?: Date) => {
+                        if (Platform.OS === 'android') {
+                          setShowEndDatePicker(false);
+                        }
+                        if (selectedDate) {
+                          setEndDate(selectedDate);
+                        }
+                      }}
+                    />
+                  )}
+                  {Platform.OS === 'web' && showEndDatePicker && (
+                    <TextInput
+                      value={formatDateForInput(endDate)}
+                      onChangeText={(text) => {
+                        if (text) {
+                          const date = new Date(text);
+                          if (!isNaN(date.getTime())) {
+                            setEndDate(date);
+                          }
+                        }
+                      }}
+                      onBlur={() => setShowEndDatePicker(false)}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={COLORS.text.secondary}
+                      style={{
+                        backgroundColor: COLORS.surface.darker,
+                        borderRadius: BORDER_RADIUS.lg,
+                        borderWidth: 1,
+                        borderColor: 'rgba(148, 163, 184, 0.2)',
+                        padding: SPACING.md,
+                        color: COLORS.text.primary,
+                        fontSize: 16,
+                        marginTop: SPACING.sm,
+                      }}
+                    />
+                  )}
+                </View>
+              </View>
+
+              {/* Reason */}
+              <View style={{ marginBottom: SPACING.lg }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '500',
+                    color: COLORS.text.primary,
+                    marginBottom: SPACING.sm,
+                  }}
+                >
+                  Lý do
+                </Text>
+                <TextInput
+                  placeholder="Nhập lý do xin nghỉ..."
+                  placeholderTextColor={COLORS.text.secondary}
+                  value={reason}
+                  onChangeText={setReason}
+                  multiline
+                  numberOfLines={4}
+                  style={{
+                    backgroundColor: COLORS.surface.darker,
+                    borderRadius: BORDER_RADIUS.lg,
+                    borderWidth: 1,
+                    borderColor: 'rgba(148, 163, 184, 0.2)',
+                    padding: SPACING.md,
+                    color: COLORS.text.primary,
+                    fontSize: 16,
+                    minHeight: 100,
+                    textAlignVertical: 'top',
+                  }}
+                />
+              </View>
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                onPress={handleSubmitRequest}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[COLORS.primary, COLORS.accent.cyan]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{
+                    borderRadius: BORDER_RADIUS.lg,
+                    paddingVertical: SPACING.md,
+                    alignItems: 'center',
+                    ...SHADOWS.md,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#ffffff',
+                      fontSize: 16,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Gửi đơn
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}
