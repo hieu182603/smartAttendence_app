@@ -16,6 +16,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import DashboardScreen from '../screens/employee/DashboardScreen';
 import ScheduleScreen from '../screens/employee/ScheduleScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import AttendanceHistoryScreen from '../screens/employee/AttendanceHistoryScreen';
 
 import RequestsScreen from '../screens/employee/RequestsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -23,6 +24,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 // Manager Screens
 import ManagerDashboardScreen from '../screens/manager/ManagerDashboardScreen';
 import ManagerTeamScreen from '../screens/manager/ManagerTeamScreen';
+import TeamReportsScreen from '../screens/manager/TeamReportsScreen';
 import ManagerApprovalsScreen from '../screens/manager/ManagerApprovalsScreen';
 import ManagerScheduleScreen from '../screens/manager/ManagerScheduleScreen';
 
@@ -32,6 +34,8 @@ import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
 import AdminReportsScreen from '../screens/admin/AdminReportsScreen';
 import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 import AdminAuditScreen from '../screens/admin/AdminAuditScreen';
+import AdminDepartmentsScreen from '../screens/admin/AdminDepartmentsScreen';
+import AdminPositionsScreen from '../screens/admin/AdminPositionsScreen';
 
 // Navigation Types
 export type RootStackParamList = {
@@ -41,6 +45,9 @@ export type RootStackParamList = {
   EmployeeTabs: undefined;
   ManagerDrawer: undefined;
   AdminDrawer: undefined;
+  AttendanceHistory: undefined;
+  AdminDepartments: undefined;
+  AdminPositions: undefined;
 };
 
 export type EmployeeTabParamList = {
@@ -56,6 +63,7 @@ export type EmployeeTabParamList = {
 export type ManagerDrawerParamList = {
   ManagerDashboard: undefined;
   ManagerTeam: undefined;
+  TeamReports: undefined;
   ManagerApprovals: undefined;
   ManagerSchedule: undefined;
   Profile: undefined;
@@ -131,6 +139,11 @@ function ManagerDrawerNavigator() {
         name="ManagerTeam"
         component={ManagerTeamScreen}
         options={{ drawerLabel: 'Team' }}
+      />
+      <Drawer.Screen
+        name="TeamReports"
+        component={TeamReportsScreen}
+        options={{ drawerLabel: 'Báo cáo' }}
       />
       <Drawer.Screen
         name="ManagerApprovals"
@@ -276,6 +289,9 @@ export default function AppNavigator({ userRole, isLoading }: AppNavigatorProps)
         <Stack.Screen name="EmployeeTabs" component={EmployeeTabNavigator} />
         <Stack.Screen name="ManagerDrawer" component={ManagerDrawerNavigator} />
         <Stack.Screen name="AdminDrawer" component={AdminDrawerNavigator} />
+        <Stack.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} />
+        <Stack.Screen name="AdminDepartments" component={AdminDepartmentsScreen} />
+        <Stack.Screen name="AdminPositions" component={AdminPositionsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

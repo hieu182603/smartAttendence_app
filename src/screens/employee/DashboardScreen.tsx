@@ -598,7 +598,8 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
               {/* Additional Stats Row */}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: SPACING.xl }}>
                 {/* Attendance This Month */}
-                <View
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('AttendanceHistory' as any)}
                   style={{
                     width: (width - SPACING.lg * 3) / 2,
                     backgroundColor: 'rgba(30, 41, 59, 0.6)',
@@ -638,9 +639,9 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
                     {stats.thisMonth}/{stats.totalDays}
                   </Text>
                   <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                    ngày làm việc
+                    giờ chi tiết &gt;
                   </Text>
-                </View>
+                </TouchableOpacity>
 
                 {/* Overtime */}
                 <View
