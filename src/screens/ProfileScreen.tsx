@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../App';
+import { useAuth } from '../context/AuthContext';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
 import { Icon } from '../components/Icon';
 
@@ -47,7 +47,7 @@ export default function ProfileScreen() {
   const [userInfo, setUserInfo] = useState<UserInfo>({
     name: user?.name || 'Nguyễn Văn A',
     employeeId: user?.employeeId || 'NV001234',
-    department: user?.department || 'Phòng Kinh Doanh',
+    department: typeof user?.department === 'object' ? user?.department?.name : (user?.department || 'Phòng Kinh Doanh'),
     position: user?.position || 'Nhân viên',
     email: user?.email || 'nguyenvana@company.com',
     phone: user?.phone || '0123 456 789',

@@ -23,7 +23,7 @@ interface RequestsScreenProps {
 }
 
 interface LeaveRequest {
-  id: number;
+  id: string | number;
   type: string;
   startDate: string;
   endDate: string;
@@ -59,42 +59,15 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
     }, [navigation])
   );
 
-  // Mock data matching web version
-  const leaveBalance = {
-    annual: 12,
-    sick: 5,
+  // State for fetched data
+  const [leaveBalance, setLeaveBalance] = useState({
+    annual: 0,
+    sick: 0,
     unpaid: 0,
-  };
-
-  const [requests, setRequests] = useState<LeaveRequest[]>([
-    {
-      id: 1,
-      type: 'Nghỉ phép năm',
-      startDate: '2026-01-15',
-      endDate: '2026-01-17',
-      reason: 'Nghỉ du lịch gia đình',
-      status: 'approved',
-      submittedDate: '2026-01-10',
-    },
-    {
-      id: 2,
-      type: 'Nghỉ ốm',
-      startDate: '2026-01-08',
-      endDate: '2026-01-08',
-      reason: 'Bị cảm nặng',
-      status: 'approved',
-      submittedDate: '2026-01-07',
-    },
-    {
-      id: 3,
-      type: 'Nghỉ phép năm',
-      startDate: '2026-01-20',
-      endDate: '2026-01-22',
-      reason: 'Việc cá nhân',
-      status: 'pending',
-      submittedDate: '2026-01-11',
-    },
-  ]);
+  });
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const leaveTypes = [
     'Nghỉ phép năm',
@@ -103,27 +76,95 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
     'Đăng ký tăng ca',
   ];
 
-  const handleSubmitRequest = () => {
+  // Map Vietnamese labels to canonical API codes
+  const mapLeaveTypeToCode = (label: string): string => {
+    const mapping: Record<string, string> = {
+      'Nghỉ phép năm': 'annual',
+      'Nghỉ ốm': 'sick',
+      'Nghỉ không lương': 'unpaid',
+      'Đăng ký tăng ca': 'other',
+    };
+    return mapping[label] || 'other';
+  };
+
+  useEffect(() => {
+    fetchLeaveData();
+  }, []);
+
+  const fetchLeaveData = async () => {
+    try {
+      setIsLoading(true);
+      const { LeaveService } = await import('../../services/leave.service');
+
+      // Parallel fetching
+      const [balanceRes, historyRes] = await Promise.all([
+        LeaveService.getBalance(),
+        LeaveService.getHistory({ limit: 10 })
+      ]);
+
+      // Map Balance
+      if (balanceRes) {
+        setLeaveBalance({
+          annual: balanceRes.annual?.remaining || 0,
+          sick: balanceRes.sick?.remaining || 0,
+          unpaid: balanceRes.unpaid?.remaining || 0, // Backend might not track unpaid limit but let's see
+        });
+      }
+
+      // Map History
+      if (historyRes && Array.isArray(historyRes)) {
+        const mappedRequests = historyRes.map((item: any) => ({
+          id: item._id, // Use string ID from DB
+          type: item.type,
+          startDate: item.startDate,
+          endDate: item.endDate,
+          reason: item.reason,
+          status: item.status,
+          submittedDate: item.createdAt,
+          rejectionReason: item.rejectionReason,
+        }));
+        setRequests(mappedRequests);
+      }
+
+    } catch (error) {
+      console.error('Error fetching leave data', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmitRequest = async () => {
     if (!leaveType || !reason) {
+      alert('Vui lòng điền đầy đủ thông tin');
       return;
     }
 
-    const newRequest: LeaveRequest = {
-      id: requests.length + 1,
-      type: leaveType,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
-      reason,
-      status: 'pending',
-      submittedDate: new Date().toISOString().split('T')[0],
-    };
+    try {
+      setIsSubmitting(true);
+      const { LeaveService } = await import('../../services/leave.service');
 
-    setRequests([newRequest, ...requests]);
-    setIsDialogOpen(false);
-    setLeaveType('');
-    setStartDate(new Date());
-    setEndDate(new Date());
-    setReason('');
+      // Map Vietnamese label to canonical code for backend
+      const canonicalType = mapLeaveTypeToCode(leaveType);
+
+      await LeaveService.createRequest({
+        type: canonicalType,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        reason: reason,
+      });
+
+      alert('Gửi đơn thành công!');
+      setIsDialogOpen(false);
+      setLeaveType('');
+      setReason('');
+      fetchLeaveData(); // Refresh list
+
+    } catch (error: any) {
+      console.error('Submit leave error', error);
+      alert(error.response?.data?.message || 'Gửi đơn thất bại');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {

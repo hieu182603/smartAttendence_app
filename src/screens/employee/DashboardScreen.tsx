@@ -11,7 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { EmployeeTabParamList } from '../../navigation/AppNavigator';
-import { useAuth } from '../../../App';
+import { useAuth } from '../../context/AuthContext';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { AttendanceStats, Activity, Notification } from '../../types';
@@ -102,9 +102,65 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
   const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState(mockNotifications);
-  const [stats] = useState(mockStats);
-  const [activities] = useState(mockActivities);
-  const [isLoading] = useState(false);
+
+  const [stats, setStats] = useState<AttendanceStats>({
+    leavesRemaining: 0,
+    totalLeaves: 12, // Default
+    thisMonth: 0,
+    totalDays: 26, // Approx working days
+    overtimeHours: 0,
+    lateCount: 0,
+  });
+
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      const { AttendanceService } = await import('../../services/attendance.service');
+      const { LeaveService } = await import('../../services/leave.service');
+
+      // Fetch Leave Balance
+      try {
+        const balance = await LeaveService.getBalance();
+        setStats(prev => ({
+          ...prev,
+          leavesRemaining: balance.annual?.remaining || 0,
+          totalLeaves: balance.annual?.total || 12,
+        }));
+      } catch (e) {
+        console.log('Error fetching leave balance', e);
+      }
+
+      // Fetch Recent Activity
+      try {
+        const recent = await AttendanceService.getRecent(5);
+        const mappedActivities = recent.map((item: any) => ({
+          id: item._id || Math.random().toString(),
+          userId: user?.id,
+          action: item.checkOut ? 'Chấm công ra' : 'Chấm công vào',
+          time: item.checkOut ? item.checkOut : item.checkIn, // This needs formatting
+          date: item.date,
+          timestamp: new Date(item.date).getTime(),
+          status: item.status === 'late' ? 'warning' : 'success',
+          details: item.location,
+        }));
+        setActivities(mappedActivities);
+      } catch (e) {
+        console.log('Error fetching recent attendance', e);
+      }
+
+    } catch (error) {
+      console.error('Dashboard fetch error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const userName = user?.name || 'Nguyễn Văn A';
   const userAvatar = user?.avatar;
@@ -114,29 +170,6 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Chào buổi sáng! 👋' : hour < 18 ? 'Chào buổi chiều! 👋' : 'Chào buổi tối! 👋';
 
-  const toggleNotifications = useCallback(() => {
-    setShowNotifications(prev => !prev);
-  }, []);
-
-  const closeNotifications = useCallback(() => {
-    setShowNotifications(false);
-  }, []);
-
-  const markAsRead = useCallback((id: string) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, unread: false } : n)
-    );
-  }, []);
-
-  const markAllAsRead = useCallback(() => {
-    setNotifications(prev =>
-      prev.map(n => ({ ...n, unread: false }))
-    );
-  }, []);
-
-  const deleteNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  }, []);
 
   const getNotificationBg = (type: Notification['type']) => {
     switch (type) {
@@ -151,6 +184,65 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
       default:
         return { bg: 'rgba(66, 69, 240, 0.2)', border: 'rgba(66, 69, 240, 0.3)' };
     }
+  };
+
+  // Check In/Out State
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isCheckedIn, setIsCheckedIn] = useState(false); // Should fetch this from status
+  const [location, setLocation] = useState<any>(null);
+
+  const handleCheckInOut = async () => {
+    try {
+      setIsProcessing(true);
+
+      const { AttendanceService } = await import('../../services/attendance.service');
+      const Location = await import('expo-location');
+
+      // 1. Get Location
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission to access location was denied');
+        setIsProcessing(false);
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+
+      // 2. Call API (Simulate Photo for now)
+      if (isCheckedIn) {
+        // Check Out
+        await AttendanceService.checkOut({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy: location.coords.accuracy || 0,
+          // photo: ... (skip photo for now or implement camera)
+        });
+        alert('Check out successful!');
+        setIsCheckedIn(false);
+      } else {
+        // Check In
+        await AttendanceService.checkIn({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy: location.coords.accuracy || 0,
+        });
+        alert('Check in successful!');
+        setIsCheckedIn(true);
+      }
+
+      // Refresh Data
+      fetchDashboardData();
+
+    } catch (error: any) {
+      console.error('Check in/out error', error);
+      alert(error.response?.data?.message || 'Check in/out failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleNotificationPress = () => {
+    navigation.navigate('Notifications');
   };
 
   return (
@@ -267,7 +359,7 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
 
               {/* Notification Bell */}
               <TouchableOpacity
-                onPress={toggleNotifications}
+                onPress={handleNotificationPress}
                 style={{
                   width: 44,
                   height: 44,
@@ -328,68 +420,66 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
 
         {/* Main Content */}
         <View style={{ paddingHorizontal: SPACING.lg, marginTop: SPACING.md }}>
-          {/* Attendance Reminder Widget */}
+          {/* Attendance Action Widget */}
           <View
             style={{
-              backgroundColor: 'rgba(66, 69, 240, 0.1)',
+              backgroundColor: isCheckedIn ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
               borderRadius: BORDER_RADIUS.lg,
               padding: SPACING.lg,
               marginBottom: SPACING.lg,
               borderWidth: 1,
-              borderColor: 'rgba(66, 69, 240, 0.2)',
+              borderColor: isCheckedIn ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  backgroundColor: 'rgba(66, 69, 240, 0.2)',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: SPACING.md,
-                }}
-              >
-                <Icon name="schedule" size={20} color={COLORS.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View>
                 <Text
                   style={{
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: '600',
                     color: COLORS.text.primary,
-                    marginBottom: SPACING.xs / 2,
+                    marginBottom: SPACING.xs,
                   }}
                 >
-                  ⏰ Nhắc nhở chấm công
+                  {isCheckedIn ? 'Đang làm việc' : 'Sẵn sàng làm việc'}
                 </Text>
                 <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                  Ca làm: 08:00 - 17:00
+                  {isCheckedIn ? 'Nhớ chấm công ra khi về nhé!' : 'Chúc bạn một ngày làm việc hiệu quả!'}
                 </Text>
               </View>
-            </View>
-            <View style={{ marginLeft: 56 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: SPACING.sm }}>
-                <Text style={{ fontSize: 12, color: COLORS.text.secondary, marginRight: SPACING.xs }}>
-                  Còn lại:
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 24,
-                    fontWeight: 'bold',
-                    color: COLORS.primary,
-                  }}
-                >
-                  2h 30m
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Icon name="location_on" size={14} color={COLORS.text.secondary} />
-                <Text style={{ fontSize: 12, color: COLORS.text.secondary, marginLeft: SPACING.xs }}>
-                  📍 Văn phòng Hà Nội
-                </Text>
-              </View>
+
+              <TouchableOpacity
+                onPress={handleCheckInOut}
+                disabled={isProcessing}
+                style={{
+                  backgroundColor: isCheckedIn ? COLORS.accent.red : COLORS.accent.green,
+                  paddingHorizontal: SPACING.lg,
+                  paddingVertical: SPACING.md,
+                  borderRadius: BORDER_RADIUS.lg,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  ...SHADOWS.md,
+                  opacity: isProcessing ? 0.7 : 1,
+                }}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Icon name={isCheckedIn ? "logout" : "login"} size={20} color="#ffffff" />
+                    <Text
+                      style={{
+                        color: '#ffffff',
+                        fontWeight: '600',
+                        fontSize: 14,
+                        marginLeft: SPACING.sm,
+                      }}
+                    >
+                      {isCheckedIn ? 'Chấm công ra' : 'Chấm công vào'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -692,190 +782,6 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
           </View>
         </View>
       </ScrollView>
-
-      {/* Notification Panel Modal */}
-      <Modal
-        visible={showNotifications}
-        transparent
-        animationType="slide"
-        onRequestClose={closeNotifications}
-      >
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            justifyContent: 'flex-start',
-            paddingTop: SPACING.xxl * 2,
-          }}
-          activeOpacity={1}
-          onPress={closeNotifications}
-        >
-          <View
-            style={{
-              backgroundColor: COLORS.surface.dark,
-              borderTopLeftRadius: BORDER_RADIUS.xl,
-              borderTopRightRadius: BORDER_RADIUS.xl,
-              maxHeight: '70%',
-              paddingTop: SPACING.lg,
-            }}
-            onStartShouldSetResponder={() => true}
-          >
-            {/* Header */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingHorizontal: SPACING.lg,
-                paddingBottom: SPACING.md,
-                borderBottomWidth: 1,
-                borderBottomColor: 'rgba(148, 163, 184, 0.1)',
-              }}
-            >
-              <View>
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: COLORS.text.primary,
-                    marginBottom: SPACING.xs / 2,
-                  }}
-                >
-                  Thông báo
-                </Text>
-                <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                  {unreadCount} thông báo mới
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {unreadCount > 0 && (
-                  <TouchableOpacity
-                    onPress={markAllAsRead}
-                    style={{
-                      padding: SPACING.sm,
-                      marginRight: SPACING.sm,
-                    }}
-                  >
-                    <Icon name="done_all" size={18} color={COLORS.accent.green} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={closeNotifications}>
-                  <Icon name="close" size={20} color={COLORS.text.primary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Notifications List */}
-            <ScrollView
-              style={{ maxHeight: 400 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {notifications.length === 0 ? (
-                <View style={{ padding: SPACING.xxl, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 48, marginBottom: SPACING.md }}>🔔</Text>
-                  <Text style={{ fontSize: 14, color: COLORS.text.secondary }}>
-                    Không có thông báo
-                  </Text>
-                </View>
-              ) : (
-                notifications.map((notification) => {
-                  const bgColors = getNotificationBg(notification.type);
-                  return (
-                    <TouchableOpacity
-                      key={notification.id}
-                      onPress={() => {
-                        if (notification.unread) {
-                          markAsRead(notification.id);
-                        }
-                      }}
-                      style={{
-                        padding: SPACING.md,
-                        borderBottomWidth: 1,
-                        borderBottomColor: 'rgba(148, 163, 184, 0.1)',
-                        backgroundColor: notification.unread
-                          ? 'rgba(66, 69, 240, 0.05)'
-                          : 'transparent',
-                        flexDirection: 'row',
-                        alignItems: 'flex-start',
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 12,
-                          backgroundColor: bgColors.bg,
-                          borderWidth: 1,
-                          borderColor: bgColors.border,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          marginRight: SPACING.md,
-                        }}
-                      >
-                        <Text style={{ fontSize: 18 }}>{notification.icon}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            marginBottom: SPACING.xs / 2,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              fontWeight: '500',
-                              color: COLORS.text.primary,
-                              flex: 1,
-                            }}
-                          >
-                            {notification.title}
-                          </Text>
-                          {notification.unread && (
-                            <View
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: COLORS.primary,
-                                marginLeft: SPACING.sm,
-                              }}
-                            />
-                          )}
-                        </View>
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: COLORS.text.secondary,
-                            marginBottom: SPACING.xs / 2,
-                          }}
-                          numberOfLines={2}
-                        >
-                          {notification.message}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                          {notification.time}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => deleteNotification(notification.id)}
-                        style={{
-                          padding: SPACING.xs,
-                          marginLeft: SPACING.sm,
-                        }}
-                      >
-                        <Icon name="delete" size={16} color={COLORS.accent.red} />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 }

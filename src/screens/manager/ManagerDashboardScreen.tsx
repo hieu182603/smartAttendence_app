@@ -11,7 +11,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useApprovals } from '../../hooks/useApprovals';
 import { useTeam } from '../../hooks/useTeam';
-import { useAuth } from '../../../App';
+import { useAuth } from '../../context/AuthContext';
 import { ApprovalRequest } from '../../types';
 
 type ManagerDashboardScreenNavigationProp = DrawerNavigationProp<ManagerDrawerParamList, 'ManagerDashboard'>;

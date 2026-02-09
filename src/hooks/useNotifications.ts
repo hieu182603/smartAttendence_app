@@ -13,31 +13,9 @@ interface UseNotificationsReturn {
 }
 
 // Mock notifications data
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'approved',
-    title: 'Đơn nghỉ phép đã được duyệt',
-    message: 'Đơn nghỉ phép của bạn từ 15/12 đến 17/12 đã được phê duyệt',
-    time: '2 giờ trước',
-    timestamp: Date.now() - 2 * 60 * 60 * 1000,
-    icon: '✅',
-    unread: true,
-  },
-  {
-    id: '2',
-    type: 'reminder',
-    title: 'Nhắc nhở chấm công',
-    message: 'Đừng quên chấm công trước 9:00 sáng',
-    time: '5 giờ trước',
-    timestamp: Date.now() - 5 * 60 * 60 * 1000,
-    icon: '⏰',
-    unread: true,
-  },
-];
 
 export function useNotifications(): UseNotificationsReturn {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,9 +27,21 @@ export function useNotifications(): UseNotificationsReturn {
     try {
       setIsLoading(true);
       setError(null);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setNotifications(mockNotifications);
+      const { NotificationService } = await import('../services/notification.service');
+      const data = await NotificationService.getAll();
+
+      if (Array.isArray(data)) {
+        setNotifications(data.map((item: any) => ({
+          id: item._id,
+          type: item.type,
+          title: item.title,
+          message: item.message,
+          time: new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          timestamp: new Date(item.createdAt).getTime(),
+          icon: item.type === 'approved' || item.type === 'success' ? '✅' : item.type === 'rejected' || item.type === 'error' ? '❌' : item.type === 'warning' ? '⚠️' : 'ℹ️',
+          unread: !item.readAt,
+        })));
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load notifications';
       setError(errorMessage);
@@ -62,6 +52,8 @@ export function useNotifications(): UseNotificationsReturn {
 
   const markAsRead = useCallback(async (id: string) => {
     try {
+      const { NotificationService } = await import('../services/notification.service');
+      await NotificationService.markAsRead(id);
       setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, unread: false } : n)
       );
@@ -73,6 +65,8 @@ export function useNotifications(): UseNotificationsReturn {
 
   const markAllAsRead = useCallback(async () => {
     try {
+      const { NotificationService } = await import('../services/notification.service');
+      await NotificationService.markAllAsRead();
       setNotifications(prev =>
         prev.map(n => ({ ...n, unread: false }))
       );
@@ -83,6 +77,7 @@ export function useNotifications(): UseNotificationsReturn {
   }, []);
 
   const deleteNotification = useCallback(async (id: string) => {
+    // Service might not implemented delete, ignoring for now or just local delete
     try {
       setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (err) {

@@ -10,42 +10,9 @@ interface UseTeamReturn {
   onLeaveCount: number;
 }
 
-// Mock team members data
-import { UserRole } from '../types';
-
-const mockMembers: TeamMember[] = [
-  {
-    id: '1',
-    name: 'Nguyễn Văn B',
-    role: UserRole.Employee,
-    department: 'Phát triển',
-    status: 'online',
-  },
-  {
-    id: '2',
-    name: 'Trần Thị C',
-    role: UserRole.Employee,
-    department: 'Phát triển',
-    status: 'on-leave',
-  },
-  {
-    id: '3',
-    name: 'Lê Văn D',
-    role: UserRole.Employee,
-    department: 'Marketing',
-    status: 'online',
-  },
-  {
-    id: '4',
-    name: 'Phạm Thị E',
-    role: UserRole.Employee,
-    department: 'Phát triển',
-    status: 'offline',
-  },
-];
 
 export function useTeam(): UseTeamReturn {
-  const [members, setMembers] = useState<TeamMember[]>(mockMembers);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,9 +20,32 @@ export function useTeam(): UseTeamReturn {
     try {
       setIsLoading(true);
       setError(null);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setMembers(mockMembers);
+      const { ManagerService } = await import('../services/manager.service');
+      const data = await ManagerService.getTeam();
+
+      if (Array.isArray(data)) {
+        setMembers(data.map((item: any) => {
+          // Determine status with priority: on-leave → online → offline
+          let status: 'online' | 'offline' | 'on-leave' = 'offline';
+
+          // Check if member is currently on approved leave
+          // Backend may use fields like: onLeave, isOnLeave, currentLeaveStatus, hasActiveLeave
+          if (item.onLeave || item.isOnLeave || item.hasActiveLeave || item.currentLeaveStatus === 'on-leave') {
+            status = 'on-leave';
+          } else if (item.isActive) {
+            status = 'online';
+          }
+
+          return {
+            id: item._id,
+            name: item.name,
+            role: item.role,
+            department: item.department?.name || 'Chưa phân bổ',
+            status,
+            // avatar: item.avatar
+          };
+        }));
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load team members';
       setError(errorMessage);

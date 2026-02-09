@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Screen, UserRole } from '../types';
 import { Icon } from './Icon';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
-import { useAuth } from '../../App';
+import { useAuth } from '../context/AuthContext';
 
 interface MenuItem {
   screen: Screen;
@@ -76,7 +76,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={[COLORS.primary, COLORS.accent.cyan]}
+        colors={[COLORS.primary, COLORS.accent.cyan] as const}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}

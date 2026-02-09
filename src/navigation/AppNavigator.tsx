@@ -15,6 +15,8 @@ import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import DashboardScreen from '../screens/employee/DashboardScreen';
 import ScheduleScreen from '../screens/employee/ScheduleScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+
 import RequestsScreen from '../screens/employee/RequestsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
@@ -97,7 +99,7 @@ function EmployeeTabNavigator() {
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Schedule" component={ScheduleScreen} />
       <Tab.Screen name="Requests" component={RequestsScreen} />
-      <Tab.Screen name="Notifications" component={RequestsScreen} />
+      <Tab.Screen name="Notifications" component={NotificationsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
       <Tab.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ tabBarButton: () => null }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarButton: () => null }} />

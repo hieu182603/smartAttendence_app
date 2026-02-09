@@ -87,32 +87,57 @@ export default function ManagerScheduleScreen({ navigation }: ManagerScheduleScr
     return day === 0 || day === 6;
   };
 
-  // Mock schedule data (in real app, this would come from API)
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
+
+  React.useEffect(() => {
+    fetchSchedule();
+  }, [currentDate]);
+
+  const fetchSchedule = async () => {
+    try {
+      setLoadingSchedule(true);
+      const { ManagerService } = await import('../../services/manager.service');
+      const data = await ManagerService.getDepartmentSchedule(
+        currentDate.getMonth() + 1,
+        currentDate.getFullYear()
+      );
+      if (Array.isArray(data)) {
+        setSchedules(data);
+      }
+    } catch (error) {
+      console.log('Error fetching schedule', error);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
   const hasShift = (date: Date | null, memberId: string) => {
     if (!date) return false;
-    // Mock: most days have shifts, weekends don't
-    return !isWeekend(date);
+    const dateStr = date.toISOString().split('T')[0];
+    // Check if member has shift on this date in schedules
+    // Assuming schedule structure: { memberId: string, shifts: { date: string, shiftId: string }[] }
+    // Or flat structure: { memberId, date, shiftId }
+    // For now, let's assume simple array of { memberId, date }
+    return schedules.some(s =>
+      s.memberId === memberId &&
+      new Date(s.date).toISOString().split('T')[0] === dateStr
+    );
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online':
-        return COLORS.status.success;
-      case 'on-leave':
-        return COLORS.status.warning;
-      default:
-        return COLORS.text.secondary;
+      case 'online': return COLORS.status.success;
+      case 'on-leave': return COLORS.status.warning;
+      default: return COLORS.text.secondary;
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'online':
-        return '● Trực tuyến';
-      case 'on-leave':
-        return '○ Nghỉ phép';
-      default:
-        return '○ Offline';
+      case 'online': return '● Trực tuyến';
+      case 'on-leave': return '○ Nghỉ phép';
+      default: return '○ Offline';
     }
   };
 

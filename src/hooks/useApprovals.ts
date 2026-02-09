@@ -11,36 +11,9 @@ interface UseApprovalsReturn {
   pendingCount: number;
 }
 
-// Mock approvals data
-const mockApprovals: ApprovalRequest[] = [
-  {
-    id: '1',
-    userId: 'user-1',
-    employeeName: 'Nguyễn Văn B',
-    type: 'annual',
-    startDate: '20/12/2024',
-    endDate: '22/12/2024',
-    days: 3,
-    reason: 'Nghỉ phép cuối năm',
-    status: 'pending',
-    submittedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
-  },
-  {
-    id: '2',
-    userId: 'user-2',
-    employeeName: 'Trần Thị C',
-    type: 'sick',
-    startDate: '18/12/2024',
-    endDate: '19/12/2024',
-    days: 2,
-    reason: 'Nghỉ ốm',
-    status: 'pending',
-    submittedAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
-  },
-];
 
 export function useApprovals(): UseApprovalsReturn {
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>(mockApprovals);
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,9 +21,23 @@ export function useApprovals(): UseApprovalsReturn {
     try {
       setIsLoading(true);
       setError(null);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setApprovals(mockApprovals);
+      const { ManagerService } = await import('../services/manager.service');
+      const data = await ManagerService.getApprovals({ status: 'pending' });
+
+      if (Array.isArray(data)) {
+        setApprovals(data.map((item: any) => ({
+          id: item._id,
+          userId: item.userId,
+          employeeName: item.user?.name || 'Unknown',
+          type: item.type,
+          startDate: new Date(item.startDate).toLocaleDateString('vi-VN'),
+          endDate: new Date(item.endDate).toLocaleDateString('vi-VN'),
+          days: Math.ceil((new Date(item.endDate).getTime() - new Date(item.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1,
+          reason: item.reason,
+          status: item.status,
+          submittedAt: new Date(item.createdAt).getTime(),
+        })));
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load approvals';
       setError(errorMessage);
@@ -61,7 +48,8 @@ export function useApprovals(): UseApprovalsReturn {
 
   const approve = useCallback(async (id: string, note?: string) => {
     try {
-      // Remove from list after approval
+      const { ManagerService } = await import('../services/manager.service');
+      await ManagerService.approveRequest(id, { reason: note });
       setApprovals(prev => prev.filter(a => a.id !== id));
     } catch (err) {
       console.error('Error approving request:', err);
@@ -71,7 +59,8 @@ export function useApprovals(): UseApprovalsReturn {
 
   const reject = useCallback(async (id: string, note: string) => {
     try {
-      // Remove from list after rejection
+      const { ManagerService } = await import('../services/manager.service');
+      await ManagerService.rejectRequest(id, { reason: note });
       setApprovals(prev => prev.filter(a => a.id !== id));
     } catch (err) {
       console.error('Error rejecting request:', err);
