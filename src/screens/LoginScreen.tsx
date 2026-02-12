@@ -26,29 +26,9 @@ interface LoginScreenProps {
 
 const { width, height } = Dimensions.get('window');
 
-import { UserRole } from '../types';
 
-// Demo accounts matching web version
-const DEMO_ACCOUNTS = [
-  {
-    email: 'employee@demo.com',
-    password: '123456',
-    role: UserRole.Employee,
-    name: 'Nguyễn Văn A',
-  },
-  {
-    email: 'manager@demo.com',
-    password: '123456',
-    role: UserRole.Manager,
-    name: 'Trần Thị B',
-  },
-  {
-    email: 'admin@demo.com',
-    password: '123456',
-    role: UserRole.Admin,
-    name: 'Lê Văn C',
-  },
-];
+
+
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const { login, error: authError, isLoading: authLoading } = useAuth();
@@ -106,59 +86,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     }
   };
 
-  const handleQuickLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
-    setEmail(account.email);
-    setPassword(account.password);
-    setLocalError(null);
 
-    try {
-      await login(account.email, account.password, rememberMe);
-    } catch (err) {
-      console.error('Quick login failed:', err);
-    }
-  };
-
-  const getRoleBadgeColor = (role: UserRole) => {
-    switch (role) {
-      case UserRole.Employee:
-        return {
-          bg: 'rgba(66, 69, 240, 0.1)',
-          text: COLORS.primary,
-          border: 'rgba(66, 69, 240, 0.2)',
-        };
-      case UserRole.Manager:
-        return {
-          bg: 'rgba(245, 158, 11, 0.1)',
-          text: COLORS.accent.yellow,
-          border: 'rgba(245, 158, 11, 0.2)',
-        };
-      case UserRole.Admin:
-        return {
-          bg: 'rgba(239, 68, 68, 0.1)',
-          text: COLORS.accent.red,
-          border: 'rgba(239, 68, 68, 0.2)',
-        };
-      default:
-        return {
-          bg: 'rgba(148, 163, 184, 0.1)',
-          text: COLORS.text.secondary,
-          border: 'rgba(148, 163, 184, 0.2)',
-        };
-    }
-  };
-
-  const getRoleLabel = (role: UserRole) => {
-    switch (role) {
-      case UserRole.Employee:
-        return 'Nhân viên';
-      case UserRole.Manager:
-        return 'Quản lý';
-      case UserRole.Admin:
-        return 'Admin/HR';
-      default:
-        return role;
-    }
-  };
 
   const errorMessage = localError || authError;
 
@@ -376,12 +304,16 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 onChangeText={setEmail}
                 placeholder="vidu@company.com"
                 placeholderTextColor="rgba(148, 163, 184, 0.5)"
-                style={{
-                  flex: 1,
-                  color: COLORS.text.primary,
-                  fontSize: 16,
-                  paddingVertical: SPACING.md,
-                }}
+                selectionColor={COLORS.primary}
+                style={[
+                  {
+                    flex: 1,
+                    color: COLORS.text.primary,
+                    fontSize: 16,
+                    paddingVertical: SPACING.md,
+                  },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                ]}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -418,12 +350,16 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 placeholder="Nhập mật khẩu"
                 placeholderTextColor="rgba(148, 163, 184, 0.5)"
                 secureTextEntry={!showPassword}
-                style={{
-                  flex: 1,
-                  color: COLORS.text.primary,
-                  fontSize: 16,
-                  paddingVertical: SPACING.md,
-                }}
+                selectionColor={COLORS.primary}
+                style={[
+                  {
+                    flex: 1,
+                    color: COLORS.text.primary,
+                    fontSize: 16,
+                    paddingVertical: SPACING.md,
+                  },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                ]}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
@@ -572,82 +508,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Demo Accounts Quick Login */}
-        <View style={{ marginTop: SPACING.xl }}>
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: '500',
-              color: COLORS.text.secondary,
-              textAlign: 'center',
-              marginBottom: SPACING.md,
-            }}
-          >
-            Hoặc đăng nhập nhanh với tài khoản demo:
-          </Text>
-          {DEMO_ACCOUNTS.map((account) => {
-            const badgeColors = getRoleBadgeColor(account.role);
-            return (
-              <TouchableOpacity
-                key={account.email}
-                onPress={() => handleQuickLogin(account)}
-                style={{
-                  backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                  borderRadius: BORDER_RADIUS.lg,
-                  padding: SPACING.md,
-                  marginBottom: SPACING.sm,
-                  borderWidth: 1,
-                  borderColor: 'rgba(148, 163, 184, 0.1)',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      color: COLORS.text.primary,
-                      fontSize: 14,
-                      fontWeight: '500',
-                      marginBottom: SPACING.xs / 2,
-                    }}
-                  >
-                    {account.name}
-                  </Text>
-                  <Text
-                    style={{
-                      color: COLORS.text.secondary,
-                      fontSize: 12,
-                    }}
-                  >
-                    {account.email}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    backgroundColor: badgeColors.bg,
-                    borderWidth: 1,
-                    borderColor: badgeColors.border,
-                    borderRadius: BORDER_RADIUS.sm,
-                    paddingHorizontal: SPACING.sm,
-                    paddingVertical: SPACING.xs / 2,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: badgeColors.text,
-                      fontSize: 11,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {getRoleLabel(account.role)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );

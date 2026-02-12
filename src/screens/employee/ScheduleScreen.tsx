@@ -19,7 +19,11 @@ interface ScheduleScreenProps {
 }
 
 const { width } = Dimensions.get('window');
-const CALENDAR_ITEM_SIZE = (width - SPACING.lg * 2 - SPACING.sm * 6) / 7;
+// Calculate available width: Screen Width - (Outer View Padding * 2) - (Card Padding * 2) - (Border Width * 2)
+const AVAILABLE_WIDTH = width - (SPACING.lg * 2) - (SPACING.lg * 2) - 2;
+// 7 items per row, 6 gaps of SPACING.sm
+const GAP_SIZE = SPACING.sm;
+const CALENDAR_ITEM_SIZE = (AVAILABLE_WIDTH - (GAP_SIZE * 6)) / 7;
 
 const monthNames = [
   'Tháng 1',
@@ -283,6 +287,8 @@ export default function ScheduleScreen({ navigation }: ScheduleScreenProps) {
             style={{
               flexDirection: 'row',
               marginBottom: SPACING.sm,
+              gap: GAP_SIZE, // Use gap for horizontal spacing
+              justifyContent: 'space-between', // Ensure full width usage
             }}
           >
             {dayNames.map((day, index) => (
@@ -312,6 +318,7 @@ export default function ScheduleScreen({ navigation }: ScheduleScreenProps) {
             style={{
               flexDirection: 'row',
               flexWrap: 'wrap',
+              gap: GAP_SIZE, // Use gap for both row and column spacing
             }}
           >
             {days.map((day, index) => {
@@ -322,8 +329,6 @@ export default function ScheduleScreen({ navigation }: ScheduleScreenProps) {
                     style={{
                       width: CALENDAR_ITEM_SIZE,
                       height: CALENDAR_ITEM_SIZE,
-                      marginRight: SPACING.sm,
-                      marginBottom: SPACING.sm,
                     }}
                   />
                 );
@@ -390,8 +395,7 @@ export default function ScheduleScreen({ navigation }: ScheduleScreenProps) {
                     borderColor,
                     justifyContent: 'center',
                     alignItems: 'center',
-                    marginRight: SPACING.sm,
-                    marginBottom: SPACING.sm,
+                    // marginRight and marginBottom handled by parent gap
                     ...(isSelected ? SHADOWS.lg : {}),
                   }}
                 >

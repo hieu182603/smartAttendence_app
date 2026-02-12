@@ -60,11 +60,11 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
   );
 
   // State for fetched data
-  const [leaveBalance, setLeaveBalance] = useState({
-    annual: 0,
-    sick: 0,
-    unpaid: 0,
-  });
+  const [leaveBalance, setLeaveBalance] = useState<any[]>([
+    { id: 'annual', name: 'Nghỉ phép năm', remaining: 0 },
+    { id: 'sick', name: 'Nghỉ ốm', remaining: 0 },
+    { id: 'unpaid', name: 'Nghỉ không lương', remaining: 0 },
+  ]);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,6 +74,8 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
     'Nghỉ ốm',
     'Nghỉ không lương',
     'Đăng ký tăng ca',
+    'Nghỉ bù',
+    'Nghỉ thai sản'
   ];
 
   // Map Vietnamese labels to canonical API codes
@@ -83,6 +85,8 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
       'Nghỉ ốm': 'sick',
       'Nghỉ không lương': 'unpaid',
       'Đăng ký tăng ca': 'other',
+      'Nghỉ bù': 'compensatory',
+      'Nghỉ thai sản': 'maternity'
     };
     return mapping[label] || 'other';
   };
@@ -102,13 +106,20 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
         LeaveService.getHistory({ limit: 10 })
       ]);
 
+      console.log('Balance Response:', balanceRes);
+
       // Map Balance
-      if (balanceRes) {
-        setLeaveBalance({
-          annual: balanceRes.annual?.remaining || 0,
-          sick: balanceRes.sick?.remaining || 0,
-          unpaid: balanceRes.unpaid?.remaining || 0, // Backend might not track unpaid limit but let's see
-        });
+      if (Array.isArray(balanceRes) && balanceRes.length > 0) {
+        setLeaveBalance(balanceRes);
+      } else if (balanceRes && typeof balanceRes === 'object') {
+        // Fallback if backend returns object with keys
+        // This handles potential transition period or API format change
+        const mapped = [];
+        if (balanceRes.annual) mapped.push({ id: 'annual', name: 'Nghỉ phép năm', remaining: balanceRes.annual.remaining || 0 });
+        if (balanceRes.sick) mapped.push({ id: 'sick', name: 'Nghỉ ốm', remaining: balanceRes.sick.remaining || 0 });
+        if (balanceRes.unpaid) mapped.push({ id: 'unpaid', name: 'Nghỉ không lương', remaining: balanceRes.unpaid.remaining || 0 });
+
+        if (mapped.length > 0) setLeaveBalance(mapped);
       }
 
       // Map History
@@ -349,157 +360,51 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
             Số ngày phép còn lại
           </Text>
         </View>
-        <View
-          style={{
-            backgroundColor: 'rgba(30, 41, 59, 0.6)',
-            borderRadius: BORDER_RADIUS.xl,
-            padding: SPACING.lg,
-            borderWidth: 1,
-            borderColor: 'rgba(148, 163, 184, 0.1)',
-            ...SHADOWS.lg,
-          }}
-        >
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          {Array.isArray(leaveBalance) && leaveBalance.map((item: any) => (
             <View
+              key={item.id}
               style={{
-                flex: 1,
-                minWidth: '50%',
-                padding: SPACING.md,
+                width: '48%',
+                backgroundColor: 'rgba(30, 41, 59, 0.6)',
                 borderRadius: BORDER_RADIUS.lg,
-                backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                marginRight: SPACING.sm,
-                marginBottom: SPACING.sm,
+                padding: SPACING.md,
+                marginBottom: SPACING.md,
                 borderWidth: 1,
-                borderColor: 'rgba(34, 197, 94, 0.2)',
+                borderColor: 'rgba(148, 163, 184, 0.1)',
+                ...SHADOWS.md,
               }}
             >
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   color: COLORS.text.secondary,
-                  marginBottom: SPACING.xs / 2,
+                  marginBottom: SPACING.xs,
+                  height: 32, // Fixed height for alignment
                 }}
+                numberOfLines={2}
               >
-                Phép năm
+                {item.name}
               </Text>
               <Text
                 style={{
                   fontSize: 24,
                   fontWeight: 'bold',
-                  color: COLORS.accent.green,
+                  color: item.remaining > 0 ? COLORS.accent.green : COLORS.text.secondary,
                 }}
               >
-                {leaveBalance.annual}
+                {item.remaining}
               </Text>
               <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
                 ngày
               </Text>
             </View>
-            <View
-              style={{
-                flex: 1,
-                minWidth: '50%',
-                padding: SPACING.md,
-                borderRadius: BORDER_RADIUS.lg,
-                backgroundColor: 'rgba(34, 211, 238, 0.1)',
-                marginBottom: SPACING.sm,
-                borderWidth: 1,
-                borderColor: 'rgba(34, 211, 238, 0.2)',
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 11,
-                  color: COLORS.text.secondary,
-                  marginBottom: SPACING.xs / 2,
-                }}
-              >
-                Nghỉ ốm
-              </Text>
-              <Text
-                style={{
-                  fontSize: 24,
-                  fontWeight: 'bold',
-                  color: COLORS.accent.cyan,
-                }}
-              >
-                {leaveBalance.sick}
-              </Text>
-              <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                ngày
-              </Text>
-            </View>
-            <View
-              style={{
-                flex: 1,
-                minWidth: '50%',
-                padding: SPACING.md,
-                borderRadius: BORDER_RADIUS.lg,
-                backgroundColor: 'rgba(148, 163, 184, 0.1)',
-                marginRight: SPACING.sm,
-                borderWidth: 1,
-                borderColor: 'rgba(148, 163, 184, 0.2)',
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 11,
-                  color: COLORS.text.secondary,
-                  marginBottom: SPACING.xs / 2,
-                }}
-              >
-                Không lương
-              </Text>
-              <Text
-                style={{
-                  fontSize: 24,
-                  fontWeight: 'bold',
-                  color: COLORS.text.secondary,
-                }}
-              >
-                {leaveBalance.unpaid}
-              </Text>
-              <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                ngày
-              </Text>
-            </View>
-          </View>
+          ))}
         </View>
       </View>
 
-      {/* New Request Button */}
-      <View style={{ paddingHorizontal: SPACING.lg, marginBottom: SPACING.lg }}>
-        <TouchableOpacity
-          onPress={() => setIsDialogOpen(true)}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.accent.cyan]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{
-              borderRadius: BORDER_RADIUS.lg,
-              paddingVertical: SPACING.md,
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-              ...SHADOWS.md,
-            }}
-          >
-            <Icon name="add" size={20} color="#ffffff" />
-            <Text
-              style={{
-                color: '#ffffff',
-                fontSize: 16,
-                fontWeight: '600',
-                marginLeft: SPACING.sm,
-              }}
-            >
-              Tạo đơn xin nghỉ mới
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+
 
       {/* Request History */}
       <View style={{ paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg }}>

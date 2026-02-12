@@ -191,54 +191,13 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
   const [isCheckedIn, setIsCheckedIn] = useState(false); // Should fetch this from status
   const [location, setLocation] = useState<any>(null);
 
-  const handleCheckInOut = async () => {
-    try {
-      setIsProcessing(true);
+  const handleCheckInOut = () => {
+    // Navigate to Attendance Screen for Face + Location Check
+    // We pass the mode (check-in if not currently checked in, check-out otherwise)
+    const mode = isCheckedIn ? 'check-out' : 'check-in';
 
-      const { AttendanceService } = await import('../../services/attendance.service');
-      const Location = await import('expo-location');
-
-      // 1. Get Location
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Permission to access location was denied');
-        setIsProcessing(false);
-        return;
-      }
-
-      let location = await Location.getCurrentPositionAsync({});
-
-      // 2. Call API (Simulate Photo for now)
-      if (isCheckedIn) {
-        // Check Out
-        await AttendanceService.checkOut({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          accuracy: location.coords.accuracy || 0,
-          // photo: ... (skip photo for now or implement camera)
-        });
-        alert('Check out successful!');
-        setIsCheckedIn(false);
-      } else {
-        // Check In
-        await AttendanceService.checkIn({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          accuracy: location.coords.accuracy || 0,
-        });
-        alert('Check in successful!');
-        setIsCheckedIn(true);
-      }
-
-      // Refresh Data
-      fetchDashboardData();
-
-    } catch (error: any) {
-      console.error('Check in/out error', error);
-      alert(error.response?.data?.message || 'Check in/out failed');
-    } finally {
-      setIsProcessing(false);
-    }
+    // @ts-ignore - Navigation type safety requires full typed hooks but for now ignore
+    navigation.navigate('Attendance', { mode });
   };
 
   const handleNotificationPress = () => {
@@ -420,68 +379,71 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
 
         {/* Main Content */}
         <View style={{ paddingHorizontal: SPACING.lg, marginTop: SPACING.md }}>
-          {/* Attendance Action Widget */}
-          <View
+          {/* Attendance Action Widget - Redesigned */}
+          <LinearGradient
+            colors={isCheckedIn ? [COLORS.accent.red, '#b91c1c'] : [COLORS.accent.green, '#047857']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={{
-              backgroundColor: isCheckedIn ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-              borderRadius: BORDER_RADIUS.lg,
+              borderRadius: BORDER_RADIUS.xl,
               padding: SPACING.lg,
               marginBottom: SPACING.lg,
-              borderWidth: 1,
-              borderColor: isCheckedIn ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+              ...SHADOWS.md,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View>
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: COLORS.text.primary,
-                    marginBottom: SPACING.xs,
-                  }}
-                >
-                  {isCheckedIn ? 'Đang làm việc' : 'Sẵn sàng làm việc'}
-                </Text>
-                <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                  {isCheckedIn ? 'Nhớ chấm công ra khi về nhé!' : 'Chúc bạn một ngày làm việc hiệu quả!'}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={handleCheckInOut}
-                disabled={isProcessing}
+            <View style={{ marginBottom: SPACING.lg }}>
+              <Text
                 style={{
-                  backgroundColor: isCheckedIn ? COLORS.accent.red : COLORS.accent.green,
-                  paddingHorizontal: SPACING.lg,
-                  paddingVertical: SPACING.md,
-                  borderRadius: BORDER_RADIUS.lg,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  ...SHADOWS.md,
-                  opacity: isProcessing ? 0.7 : 1,
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  color: '#ffffff',
+                  marginBottom: SPACING.xs,
                 }}
               >
-                {isProcessing ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <>
-                    <Icon name={isCheckedIn ? "logout" : "login"} size={20} color="#ffffff" />
-                    <Text
-                      style={{
-                        color: '#ffffff',
-                        fontWeight: '600',
-                        fontSize: 14,
-                        marginLeft: SPACING.sm,
-                      }}
-                    >
-                      {isCheckedIn ? 'Chấm công ra' : 'Chấm công vào'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                {isCheckedIn ? 'Đang làm việc' : 'Sẵn sàng làm việc'}
+              </Text>
+              <Text style={{ fontSize: 14, color: 'rgba(255, 255, 255, 0.9)' }}>
+                {isCheckedIn ? 'Hãy chấm công ra khi kết thúc ca làm việc.' : 'Chúc bạn một ngày làm việc hiệu quả!'}
+              </Text>
             </View>
-          </View>
+
+            <TouchableOpacity
+              onPress={handleCheckInOut}
+              disabled={isProcessing}
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: BORDER_RADIUS.lg,
+                paddingVertical: SPACING.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                ...SHADOWS.sm,
+              }}
+            >
+              {isProcessing ? (
+                <ActivityIndicator size="small" color={isCheckedIn ? COLORS.accent.red : COLORS.accent.green} />
+              ) : (
+                <>
+                  <Icon
+                    name={isCheckedIn ? "logout" : "login"}
+                    size={24}
+                    color={isCheckedIn ? COLORS.accent.red : COLORS.accent.green}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 'bold',
+                      color: isCheckedIn ? COLORS.accent.red : COLORS.accent.green,
+                      marginLeft: SPACING.sm,
+                    }}
+                  >
+                    {isCheckedIn ? 'Chấm công ra' : 'Chấm công vào'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </LinearGradient>
 
           {/* Stats Cards Grid */}
           {isLoading ? (

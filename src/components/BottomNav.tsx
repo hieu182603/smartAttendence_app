@@ -16,7 +16,7 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
     { name: 'Home', icon: 'home', label: 'Home' },
     { name: 'Schedule', icon: 'calendar_month', label: 'Schedule' },
     { name: 'Requests', icon: 'assignment', label: 'Requests' },
-    { name: 'Notifications', icon: 'assignment', label: 'Ngày nghỉ' },
+    { name: 'Leaves', icon: 'assignment', label: 'Ngày nghỉ' },
     { name: 'Profile', icon: 'person', label: 'Profile' },
   ];
 
@@ -47,8 +47,8 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
             // This button opens create leave request modal
             if (index === 2) {
               const handleCreateLeave = () => {
-                // Navigate to Notifications tab (which shows RequestsScreen) and open modal
-                navigation.navigate('Notifications' as any, { openCreateModal: true } as any);
+                // Navigate to Leaves tab (which shows RequestsScreen) and open modal
+                navigation.navigate('Leaves' as any, { openCreateModal: true } as any);
                 // Also navigate to Requests tab as fallback
                 navigation.navigate('Requests' as any, { openCreateModal: true } as any);
               };
@@ -73,16 +73,10 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
               );
             }
 
-            // Add specific margins for certain tabs
+            // Add specific margins for certain tabs - REMOVED
             const tabItemStyle: any[] = [styles.tabItem];
-            if (item.name === 'Notifications') {
-              // Tăng margin trái cho tab "Ngày nghỉ"
-              tabItemStyle.push({ marginLeft: SPACING.md });
-            }
-            if (item.name === 'Schedule') {
-              // Tăng margin phải cho tab "Schedule"
-              tabItemStyle.push({ marginRight: SPACING.md });
-            }
+            // Since we are using flex: 1 for all items including the middle button wrapper,
+            // we don't need manual margins anymore.
 
             return (
               <TouchableOpacity
@@ -133,22 +127,21 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.05)',
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.lg + 6,
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.sm, // Reduced horizontal padding to give more space
     ...SHADOWS.lg,
   },
   tabsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between', // Distribute evenly
     alignItems: 'flex-end',
     position: 'relative',
-    paddingHorizontal: SPACING.md,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    minWidth: 56,
+    justifyContent: 'center', // Center content
     paddingTop: SPACING.xs,
-    marginHorizontal: SPACING.sm,
+    // Removed fixed minWidth to allow flex to work
   },
   iconContainer: {
     padding: SPACING.xs + 2,
@@ -168,10 +161,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   floatingButtonContainer: {
-    position: 'absolute',
-    left: '50%',
-    marginLeft: -28,
-    bottom: 20,
+    // Removed absolute positioning to partake in flex layout
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start', // Align to top
+    marginTop: -28, // Pull up to overlap border
     zIndex: 10,
   },
   floatingButton: {

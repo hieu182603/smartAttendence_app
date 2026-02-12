@@ -17,6 +17,7 @@ import DashboardScreen from '../screens/employee/DashboardScreen';
 import ScheduleScreen from '../screens/employee/ScheduleScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import AttendanceHistoryScreen from '../screens/employee/AttendanceHistoryScreen';
+import AttendanceScreen from '../screens/employee/AttendanceScreen';
 
 import RequestsScreen from '../screens/employee/RequestsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -46,15 +47,17 @@ export type RootStackParamList = {
   ManagerDrawer: undefined;
   AdminDrawer: undefined;
   AttendanceHistory: undefined;
+  Attendance: { mode: 'check-in' | 'check-out'; reason?: string } | undefined;
   AdminDepartments: undefined;
   AdminPositions: undefined;
+  Notifications: undefined;
 };
 
 export type EmployeeTabParamList = {
   Home: undefined;
   Schedule: undefined;
   Requests: { openCreateModal?: boolean } | undefined;
-  Notifications: { openCreateModal?: boolean } | undefined;
+  Leaves: { openCreateModal?: boolean } | undefined;
   Profile: undefined;
   ChangePassword: undefined;
   Settings: undefined;
@@ -106,8 +109,8 @@ function EmployeeTabNavigator() {
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Schedule" component={ScheduleScreen} />
-      <Tab.Screen name="Requests" component={RequestsScreen} />
-      <Tab.Screen name="Notifications" component={NotificationsScreen} />
+      <Tab.Screen name="Requests" component={RequestsScreen} options={{ tabBarButton: () => null }} />
+      <Tab.Screen name="Leaves" component={RequestsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
       <Tab.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ tabBarButton: () => null }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarButton: () => null }} />
@@ -290,6 +293,8 @@ export default function AppNavigator({ userRole, isLoading }: AppNavigatorProps)
         <Stack.Screen name="ManagerDrawer" component={ManagerDrawerNavigator} />
         <Stack.Screen name="AdminDrawer" component={AdminDrawerNavigator} />
         <Stack.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="Attendance" component={AttendanceScreen} />
         <Stack.Screen name="AdminDepartments" component={AdminDepartmentsScreen} />
         <Stack.Screen name="AdminPositions" component={AdminPositionsScreen} />
       </Stack.Navigator>
