@@ -100,11 +100,21 @@ const iconMap: { [key: string]: { family: string; name: string } } = {
   lock_open: { family: 'Ionicons', name: 'lock-open' },
   key: { family: 'Ionicons', name: 'key' },
   phone: { family: 'Ionicons', name: 'call' },
-  
+
   // Manager Dashboard icons
   person_check: { family: 'MaterialIcons', name: 'person-check' },
   supervisor_account: { family: 'MaterialIcons', name: 'supervisor-account' },
   email: { family: 'Ionicons', name: 'mail' },
+
+  // Camera
+  cameraswitch: { family: 'MaterialIcons', name: 'cameraswitch' },
+  camera: { family: 'Ionicons', name: 'camera' },
+  photo_camera: { family: 'MaterialIcons', name: 'photo-camera' },
+  face: { family: 'MaterialIcons', name: 'face' },
+
+  // Alerts
+  alarm: { family: 'Ionicons', name: 'alarm' },
+  cancel: { family: 'MaterialIcons', name: 'cancel' },
 };
 
 export const Icon: React.FC<IconProps> = ({

@@ -12,31 +12,34 @@ import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Notification } from '../types';
+import { useSocket } from '../context/SocketContext';
 
 export default function NotificationsScreen() {
   const navigation = useNavigation();
+  const { socket } = useSocket();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const mapNotification = (item: any): Notification => ({
+    id: item._id,
+    type: item.type,
+    title: item.title,
+    message: item.message,
+    time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    timestamp: new Date(item.createdAt).getTime(),
+    unread: !item.isRead,
+    icon: item.type === 'approved' || item.type === 'request_approved' ? 'check_circle' :
+      item.type === 'rejected' || item.type === 'request_rejected' ? 'cancel' :
+        item.type === 'reminder' ? 'alarm' : 'info',
+  });
 
   const fetchNotifications = async () => {
     try {
       const { NotificationService } = await import('../services/notification.service');
       const data = await NotificationService.getAll({ limit: 20 });
       if (Array.isArray(data)) {
-        // Map backend data to frontend type if needed
-        setNotifications(data.map((item: any) => ({
-          id: item._id,
-          type: item.type, // approved, rejected, reminder, info, warning
-          title: item.title,
-          message: item.message,
-          time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          timestamp: new Date(item.createdAt).getTime(),
-          unread: !item.isRead,
-          icon: item.type === 'approved' ? 'check_circle' :
-            item.type === 'rejected' ? 'cancel' :
-              item.type === 'reminder' ? 'alarm' : 'info',
-        })));
+        setNotifications(data.map(mapNotification));
       }
     } catch (error) {
       console.log('Error fetching notifications', error);
@@ -51,6 +54,23 @@ export default function NotificationsScreen() {
       fetchNotifications();
     }, [])
   );
+
+  // 🔴 Realtime: Listen for new notifications via Socket.IO
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewNotification = (data: any) => {
+      console.log('[Socket] New notification received:', data.title);
+      const mapped = mapNotification(data);
+      setNotifications(prev => [mapped, ...prev]);
+    };
+
+    socket.on('notification', handleNewNotification);
+
+    return () => {
+      socket.off('notification', handleNewNotification);
+    };
+  }, [socket]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

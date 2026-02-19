@@ -21,6 +21,7 @@ import { AttendanceService } from '../../services/attendance.service';
 import { LeaveService } from '../../services/leave.service';
 import { NotificationService } from '../../services/notification.service';
 import { AttendanceStats, Activity, Notification } from '../../types';
+import { useSocket } from '../../context/SocketContext';
 
 type DashboardScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Home'>;
 
@@ -160,6 +161,42 @@ export default function DashboardScreen() {
 
   // Check In/Out State
   const [isProcessing, setIsProcessing] = useState(false);
+  const { socket } = useSocket();
+
+  // 🔴 Realtime: Listen for socket events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewNotification = (data: any) => {
+      console.log('[Dashboard] New notification via socket:', data.title);
+      // Add to notifications list
+      const mapped = {
+        id: data._id,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        time: new Date(data.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        unread: !data.isRead,
+        icon: data.type === 'approved' || data.type === 'request_approved' ? 'check_circle' :
+          data.type === 'rejected' || data.type === 'request_rejected' ? 'cancel' :
+            data.type === 'reminder' ? 'alarm' : 'info',
+      };
+      setNotifications(prev => [mapped, ...prev].slice(0, 5));
+    };
+
+    const handleAttendanceUpdate = () => {
+      // Re-fetch dashboard data when attendance is updated
+      fetchDashboardData();
+    };
+
+    socket.on('notification', handleNewNotification);
+    socket.on('attendance-updated', handleAttendanceUpdate);
+
+    return () => {
+      socket.off('notification', handleNewNotification);
+      socket.off('attendance-updated', handleAttendanceUpdate);
+    };
+  }, [socket]);
 
   const handleCheckInOut = () => {
     // Navigate to Attendance Screen for Face + Location Check

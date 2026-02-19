@@ -22,11 +22,11 @@ interface ScheduleScreenProps {
 }
 
 const { width } = Dimensions.get('window');
-// Calculate available width: Screen Width - (Outer View Padding * 2) - (Card Padding * 2) - (Border Width * 2)
-const AVAILABLE_WIDTH = width - (SPACING.lg * 2) - (SPACING.lg * 2) - 2;
-// 7 items per row, 6 gaps of SPACING.sm
+const SPACING_LG = SPACING.lg;
 const GAP_SIZE = SPACING.sm;
-const CALENDAR_ITEM_SIZE = (AVAILABLE_WIDTH - (GAP_SIZE * 6)) / 7;
+const TOTAL_HORIZONTAL_PADDING = SPACING_LG * 2;
+// 7 items per row, 6 gaps. Use Math.floor to ensure it fits without rounding errors causing wrap.
+const CALENDAR_ITEM_SIZE = Math.floor((width - TOTAL_HORIZONTAL_PADDING - (GAP_SIZE * 6)) / 7) - 1;
 
 const monthNames = [
   'Tháng 1',
@@ -43,8 +43,6 @@ const monthNames = [
   'Tháng 12',
 ];
 
-const CELL_SIZE = (width - SPACING.lg * 2) / 7;
-
 const DAYS_OF_WEEK = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 export default function ScheduleScreen() {
@@ -54,6 +52,14 @@ export default function ScheduleScreen() {
   const [leaveDays, setLeaveDays] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
+  // Helper to format date as YYYY-MM-DD
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const fetchSchedule = async (date: Date) => {
     try {
       setLoading(true);
@@ -61,15 +67,44 @@ export default function ScheduleScreen() {
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const monthStr = `${year}-${month}`;
 
-      const data = await AttendanceService.getSchedule(monthStr);
+      console.log(`Fetching schedule for: ${monthStr}`);
+      const response = await AttendanceService.getSchedule(monthStr);
+      console.log('Schedule data:', JSON.stringify(response, null, 2));
 
-      // Expected data format from API: 
-      // { shifts: { 'YYYY-MM-DD': { startTime: '...', endTime: '...', type: '...' } }, 
-      //   leaves: { 'YYYY-MM-DD': { type: '...', status: '...' } } }
+      // Handle response structure
+      // If response.data exists, use it. Otherwise use response directly.
+      const data = response.data || response;
 
       if (data) {
-        setShifts(data.shifts || {});
-        setLeaveDays(data.leaves || {});
+        // Normalize keys to YYYY-MM-DD just in case
+        const normalizedShifts: Record<string, any> = {};
+        if (data.shifts) {
+          Object.keys(data.shifts).forEach(key => {
+            const dateParams = new Date(key);
+            if (!isNaN(dateParams.getTime())) {
+              const normalizedKey = formatDate(dateParams);
+              normalizedShifts[normalizedKey] = data.shifts[key];
+            } else {
+              normalizedShifts[key] = data.shifts[key];
+            }
+          });
+        }
+
+        const normalizedLeaves: Record<string, any> = {};
+        if (data.leaves) {
+          Object.keys(data.leaves).forEach(key => {
+            const dateParams = new Date(key);
+            if (!isNaN(dateParams.getTime())) {
+              const normalizedKey = formatDate(dateParams);
+              normalizedLeaves[normalizedKey] = data.leaves[key];
+            } else {
+              normalizedLeaves[key] = data.leaves[key];
+            }
+          });
+        }
+
+        setShifts(normalizedShifts);
+        setLeaveDays(normalizedLeaves);
       }
     } catch (error) {
       console.log('Error fetching schedule:', error);
@@ -81,7 +116,7 @@ export default function ScheduleScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchSchedule(currentDate);
-    }, [currentDate]) // Re-fetch when month changes
+    }, [currentDate])
   );
 
   const getDaysInMonth = (date: Date) => {
@@ -107,13 +142,6 @@ export default function ScheduleScreen() {
     newDate.setMonth(newDate.getMonth() + increment);
     setCurrentDate(newDate);
     setSelectedDate(null);
-  };
-
-  const formatDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   };
 
   const isToday = (date: Date) => {
@@ -169,7 +197,7 @@ export default function ScheduleScreen() {
             <Icon name="chevron_left" size={24} color={COLORS.text.primary} />
           </TouchableOpacity>
           <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.text.primary }}>
-            Tháng {currentDate.getMonth() + 1}, {currentDate.getFullYear()}
+            {monthNames[currentDate.getMonth()]}, {currentDate.getFullYear()}
           </Text>
           <TouchableOpacity
             onPress={() => changeMonth(1)}
@@ -191,7 +219,14 @@ export default function ScheduleScreen() {
             {/* Days Header */}
             <View style={{ flexDirection: 'row', paddingHorizontal: SPACING.lg, marginBottom: SPACING.md }}>
               {DAYS_OF_WEEK.map((day, index) => (
-                <View key={index} style={{ width: CELL_SIZE, alignItems: 'center' }}>
+                <View
+                  key={index}
+                  style={{
+                    width: CALENDAR_ITEM_SIZE,
+                    alignItems: 'center',
+                    marginRight: index < 6 ? GAP_SIZE : 0,
+                  }}
+                >
                   <Text
                     style={{
                       fontSize: 12,
@@ -208,8 +243,18 @@ export default function ScheduleScreen() {
             {/* Calendar Grid */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SPACING.lg }}>
               {days.map((date, index) => {
+                const isLastInRow = (index + 1) % 7 === 0;
+
                 if (!date) {
-                  return <View key={`empty-${index}`} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
+                  return <View
+                    key={`empty-${index}`}
+                    style={{
+                      width: CALENDAR_ITEM_SIZE,
+                      height: CALENDAR_ITEM_SIZE,
+                      marginRight: isLastInRow ? 0 : GAP_SIZE,
+                      marginBottom: GAP_SIZE,
+                    }}
+                  />;
                 }
 
                 const dateStr = formatDate(date);
@@ -217,17 +262,9 @@ export default function ScheduleScreen() {
                 const isLeave = leaveDays[dateStr];
                 const isSelected = selectedDate === dateStr;
                 const isCurrentDay = isToday(date);
-
                 const day = date.getDate();
-
-                // Check if day is from another month (if days includes padding days)
-                // const isCurrentMonth = date.getMonth() === currentMonth.getMonth(); 
-                // However, looks like we only render current month days based on logic? 
-                // Let's assume days are correct.
-
                 const dayOfWeek = date.getDay();
                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                const isLeaveDay = !!leaveDays[dateStr];
 
                 // Determine day type and colors
                 let backgroundColor = 'transparent';
@@ -240,7 +277,7 @@ export default function ScheduleScreen() {
                   textColor = '#ffffff';
                   borderColor = COLORS.primary;
                   dotColor = '#ffffff';
-                } else if (isLeaveDay) {
+                } else if (isLeave) {
                   backgroundColor = COLORS.accent.red;
                   textColor = '#ffffff';
                   borderColor = COLORS.accent.red;
@@ -250,7 +287,8 @@ export default function ScheduleScreen() {
                   textColor = '#ffffff';
                   borderColor = COLORS.accent.green;
                   dotColor = '#ffffff';
-                } else if (isWeekend) {
+                } else if (isWeekend && !hasShift) {
+                  // Only gray out if no shift assigned
                   backgroundColor = 'rgba(148, 163, 184, 0.2)';
                   textColor = COLORS.text.secondary;
                   borderColor = 'rgba(148, 163, 184, 0.3)';
@@ -272,7 +310,8 @@ export default function ScheduleScreen() {
                       borderColor,
                       justifyContent: 'center',
                       alignItems: 'center',
-                      // marginRight and marginBottom handled by parent gap
+                      marginRight: isLastInRow ? 0 : GAP_SIZE,
+                      marginBottom: GAP_SIZE,
                       ...(isSelected ? SHADOWS.lg : {}),
                     }}
                   >
@@ -287,14 +326,14 @@ export default function ScheduleScreen() {
                     </Text>
 
                     {/* Dot indicator */}
-                    {(hasShift || isLeaveDay) && (
+                    {(hasShift || isLeave) && (
                       <View
                         style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 3,
+                          width: 4,
+                          height: 4,
+                          borderRadius: 2,
                           backgroundColor: dotColor,
-                          marginTop: 2,
+                          marginTop: 4,
                         }}
                       />
                     )}

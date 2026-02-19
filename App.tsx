@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { globalStyles } from './src/utils/styles';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { SocketProvider } from './src/context/SocketContext';
 
 function AppContent() {
   const { userRole, isLoading } = useAuth();
@@ -24,10 +25,12 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <View style={globalStyles.container}>
-          <StatusBar style="light" backgroundColor="#101122" />
-          <AppContent />
-        </View>
+        <SocketProvider>
+          <View style={globalStyles.container}>
+            <StatusBar style="light" backgroundColor="#101122" />
+            <AppContent />
+          </View>
+        </SocketProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
