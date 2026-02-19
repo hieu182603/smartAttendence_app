@@ -30,80 +30,6 @@ interface DashboardScreenProps {
 
 const { width } = Dimensions.get('window');
 
-// Mock data matching web version
-const mockStats: AttendanceStats = {
-  leavesRemaining: 12,
-  totalLeaves: 15,
-  thisMonth: 18,
-  totalDays: 20,
-  overtimeHours: 8,
-  lateCount: 2,
-};
-
-const mockActivities: Activity[] = [
-  {
-    id: 'act-001',
-    userId: 'emp-001',
-    action: 'Chấm công vào',
-    time: '08:00',
-    date: 'Hôm nay',
-    timestamp: Date.now(),
-    status: 'success',
-    details: 'Chấm công thành công',
-  },
-  {
-    id: 'act-002',
-    userId: 'emp-001',
-    action: 'Đơn nghỉ phép được duyệt',
-    time: '14:30',
-    date: 'Hôm qua',
-    timestamp: Date.now() - 24 * 60 * 60 * 1000,
-    status: 'success',
-  },
-  {
-    id: 'act-003',
-    userId: 'emp-001',
-    action: 'Chấm công ra',
-    time: '17:30',
-    date: 'Hôm qua',
-    timestamp: Date.now() - 24 * 60 * 60 * 1000,
-    status: 'success',
-  },
-];
-
-const mockNotifications: Notification[] = [
-  {
-    id: 'notif-001',
-    type: 'approved',
-    title: 'Đơn nghỉ phép được duyệt',
-    message: 'Đơn nghỉ phép ngày 15-17/01 đã được phê duyệt',
-    time: '2 giờ trước',
-    timestamp: Date.now() - 2 * 60 * 60 * 1000,
-    icon: '✓',
-    unread: true,
-  },
-  {
-    id: 'notif-002',
-    type: 'reminder',
-    title: 'Nhắc nhở ca làm việc',
-    message: 'Ca làm việc của bạn bắt đầu lúc 08:00 sáng mai',
-    time: '5 giờ trước',
-    timestamp: Date.now() - 5 * 60 * 60 * 1000,
-    icon: '⏰',
-    unread: true,
-  },
-  {
-    id: 'notif-003',
-    type: 'info',
-    title: 'Cập nhật bảng lương',
-    message: 'Bảng lương tháng 12 đã được cập nhật',
-    time: '1 ngày trước',
-    timestamp: Date.now() - 24 * 60 * 60 * 1000,
-    icon: 'ℹ',
-    unread: false,
-  },
-];
-
 export default function DashboardScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
@@ -122,6 +48,7 @@ export default function DashboardScreen() {
   const [activities, setActivities] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
@@ -137,9 +64,18 @@ export default function DashboardScreen() {
         ...prev,
         leavesRemaining: balance.annual?.remaining || 0,
         totalLeaves: balance.annual?.total || 12,
-        // Overtime and Likelihood would typically come from another API summary endpoint
-        // For now, keeping defaults or plausible values until that endpoint exists
       }));
+
+      // Determine check-in status from today's latest attendance
+      if (Array.isArray(recentAttendance) && recentAttendance.length > 0) {
+        const today = new Date().toISOString().split('T')[0];
+        const todayRecord = recentAttendance.find((item: any) => {
+          const recordDate = new Date(item.checkInTime).toISOString().split('T')[0];
+          return recordDate === today;
+        });
+        // If there's a today record with checkIn but no checkOut, user is currently checked in
+        setIsCheckedIn(!!todayRecord && !!todayRecord.checkInTime && !todayRecord.checkOutTime);
+      }
 
       // Update Activities
       const mappedActivities = recentAttendance.map((item: any) => ({
@@ -216,8 +152,6 @@ export default function DashboardScreen() {
 
   // Check In/Out State
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isCheckedIn, setIsCheckedIn] = useState(false); // Should fetch this from status
-  const [location, setLocation] = useState<any>(null);
 
   const handleCheckInOut = () => {
     // Navigate to Attendance Screen for Face + Location Check
@@ -757,7 +691,7 @@ export default function DashboardScreen() {
                               marginBottom: SPACING.xs / 2,
                             }}
                           >
-                            {activity.action}
+                            {activity.title}
                           </Text>
                           <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
                             {activity.time} • {activity.date}

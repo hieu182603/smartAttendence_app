@@ -77,8 +77,9 @@ export function useNotifications(): UseNotificationsReturn {
   }, []);
 
   const deleteNotification = useCallback(async (id: string) => {
-    // Service might not implemented delete, ignoring for now or just local delete
     try {
+      const { NotificationService } = await import('../services/notification.service');
+      await NotificationService.delete(id);
       setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (err) {
       console.error('Error deleting notification:', err);

@@ -101,7 +101,32 @@ export default function ProfileScreen() {
       });
 
     } catch (error) {
-      console.log('Error fetching user profile', error);
+      console.log('Error fetching user profile, using auth data as fallback', error);
+      // Fallback to AuthContext user data when API fails
+      if (user) {
+        setUserInfo({
+          name: user.name || '',
+          employeeId: (user as any).employeeId || '',
+          department: (user as any).department?.name || (user as any).department || '',
+          position: (user as any).position || '',
+          email: user.email || '',
+          phone: (user as any).phone || '',
+          salary: {
+            basic: '0',
+            currency: 'VNĐ',
+            taxCode: '',
+          },
+          bankInfo: {
+            name: '',
+            accountNumber: '',
+          }
+        });
+        setEditPersonalForm({
+          name: user.name || '',
+          email: user.email || '',
+          phone: (user as any).phone || '',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -123,7 +148,7 @@ export default function ProfileScreen() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ color: COLORS.text.secondary }}>Không thể tải thông tin người dùng</Text>
-        <TouchableOpacity onPress={fetchProfile} style={{ padding: 10, marginTop: 10 }}>
+        <TouchableOpacity onPress={() => { setLoading(true); fetchProfile(); }} style={{ padding: 10, marginTop: 10 }}>
           <Text style={{ color: COLORS.primary }}>Thử lại</Text>
         </TouchableOpacity>
       </View>

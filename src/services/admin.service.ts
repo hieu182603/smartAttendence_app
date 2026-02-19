@@ -1,19 +1,5 @@
 import api from '../libs/axios';
 
-// Mock data
-let MOCK_DEPARTMENTS = [
-    { id: 'dep-001', name: 'Nhân sự', description: 'Quản lý nhân sự và tuyển dụng', head: 'Nguyen Van A' },
-    { id: 'dep-002', name: 'Marketing', description: 'Tiếp thị và quảng cáo', head: 'Tran Thi B' },
-    { id: 'dep-003', name: 'Kỹ thuật', description: 'Phát triển phần mềm', head: 'Le Van C' },
-];
-
-let MOCK_POSITIONS = [
-    { id: 'pos-001', title: 'Giám đốc', level: 1 },
-    { id: 'pos-002', title: 'Trưởng phòng', level: 2 },
-    { id: 'pos-003', title: 'Nhân viên', level: 3 },
-    { id: 'pos-004', title: 'Thực tập sinh', level: 4 },
-];
-
 export const AdminService = {
     // Departments
     getDepartments: async () => {
@@ -38,8 +24,13 @@ export const AdminService = {
 
     // Positions
     getPositions: async () => {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return MOCK_POSITIONS;
+        try {
+            const response = await api.get('/positions');
+            return response.data.positions || response.data;
+        } catch (e) {
+            console.log('Error fetching positions, using defaults', e);
+            return [];
+        }
     },
 
     // Utils for dropdowns
@@ -55,10 +46,16 @@ export const AdminService = {
 
     // Settings
     getSystemSettings: async () => {
-        return {
-            workStartTime: '08:00',
-            workEndTime: '17:00',
-            allowedLateMinutes: 15
-        };
+        try {
+            const response = await api.get('/settings');
+            return response.data;
+        } catch (e) {
+            console.log('Error fetching settings, using defaults', e);
+            return {
+                workStartTime: '08:00',
+                workEndTime: '17:00',
+                allowedLateMinutes: 15
+            };
+        }
     }
 };
