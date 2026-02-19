@@ -7,12 +7,15 @@ import {
   TextInput,
   Modal,
   Switch,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
 import { Icon } from '../components/Icon';
+import { UserService } from '../services/user.service';
 
 interface UserInfo {
   name: string;
@@ -37,69 +40,136 @@ export default function ProfileScreen() {
   const navigation = useNavigation();
   const [showSalary, setShowSalary] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkMode, setDarkMode] = useState(true); // Mock dark mode state
+  const [darkMode, setDarkMode] = useState(true);
 
   // Edit dialogs state
   const [showEditPersonal, setShowEditPersonal] = useState(false);
   const [showEditSalary, setShowEditSalary] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Mock user data with state
-  const [userInfo, setUserInfo] = useState<UserInfo>({
-    name: user?.name || 'Nguyễn Văn A',
-    employeeId: user?.employeeId || 'NV001234',
-    department: typeof user?.department === 'object' ? user?.department?.name : (user?.department || 'Phòng Kinh Doanh'),
-    position: user?.position || 'Nhân viên',
-    email: user?.email || 'nguyenvana@company.com',
-    phone: user?.phone || '0123 456 789',
-    salary: {
-      basic: '15,000,000',
-      currency: 'VNĐ',
-      taxCode: '0123456789',
-    },
-    bankInfo: {
-      name: 'Ngân hàng Vietcombank',
-      accountNumber: '1234567890',
-    },
-  });
+  // User data state
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
   // Form states for editing
   const [editPersonalForm, setEditPersonalForm] = useState({
-    name: userInfo.name,
-    email: userInfo.email,
-    phone: userInfo.phone,
+    name: '',
+    email: '',
+    phone: '',
   });
 
   const [editSalaryForm, setEditSalaryForm] = useState({
-    basic: userInfo.salary.basic,
-    taxCode: userInfo.salary.taxCode,
-    bankName: userInfo.bankInfo.name,
-    accountNumber: userInfo.bankInfo.accountNumber,
+    basic: '',
+    taxCode: '',
+    bankName: '',
+    accountNumber: '',
   });
 
-  const handleSavePersonal = () => {
-    setUserInfo((prev) => ({
-      ...prev,
-      name: editPersonalForm.name,
-      email: editPersonalForm.email,
-      phone: editPersonalForm.phone,
-    }));
-    setShowEditPersonal(false);
+  const fetchProfile = async () => {
+    try {
+      const profile = await UserService.getProfile();
+      // Map backend response to frontend UserInfo interface if needed
+      // Assuming backend returns matching structure or we map it here
+      setUserInfo({
+        name: profile.name || user?.name || '',
+        employeeId: profile.employeeId || user?.employeeId || '',
+        department: profile.department?.name || profile.department || '',
+        position: profile.position || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        salary: {
+          basic: profile.salary?.basic || '0',
+          currency: profile.salary?.currency || 'VNĐ',
+          taxCode: profile.salary?.taxCode || '',
+        },
+        bankInfo: {
+          name: profile.bankInfo?.name || '',
+          accountNumber: profile.bankInfo?.accountNumber || '',
+        }
+      });
+
+      // Initial form values
+      setEditPersonalForm({
+        name: profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+      });
+      setEditSalaryForm({
+        basic: profile.salary?.basic || '',
+        taxCode: profile.salary?.taxCode || '',
+        bankName: profile.bankInfo?.name || '',
+        accountNumber: profile.bankInfo?.accountNumber || '',
+      });
+
+    } catch (error) {
+      console.log('Error fetching user profile', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSaveSalary = () => {
-    setUserInfo((prev) => ({
-      ...prev,
-      salary: {
-        ...prev.salary,
-        basic: editSalaryForm.basic,
-        taxCode: editSalaryForm.taxCode,
-      },
-      bankInfo: {
-        name: editSalaryForm.bankName,
+  React.useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  if (!userInfo) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: COLORS.text.secondary }}>Không thể tải thông tin người dùng</Text>
+        <TouchableOpacity onPress={fetchProfile} style={{ padding: 10, marginTop: 10 }}>
+          <Text style={{ color: COLORS.primary }}>Thử lại</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const handleSavePersonal = async () => {
+    try {
+      await UserService.updateProfile({
+        name: editPersonalForm.name,
+        phone: editPersonalForm.phone,
+        // Email might be read-only depending on backend rules
+      });
+
+      setUserInfo((prev) => prev ? ({
+        ...prev,
+        name: editPersonalForm.name,
+        phone: editPersonalForm.phone,
+        // Update email if allowed
+      }) : null);
+      setShowEditPersonal(false);
+    } catch (error) {
+      console.log('Error updating profile', error);
+      // Show alert error
+    }
+  };
+
+  const handleSaveSalary = async () => {
+    try {
+      // Only update bank info
+      await UserService.updateBankInfo({
+        bankName: editSalaryForm.bankName,
         accountNumber: editSalaryForm.accountNumber,
-      },
-    }));
-    setShowEditSalary(false);
+      });
+
+      setUserInfo((prev) => prev ? ({
+        ...prev,
+        bankInfo: {
+          name: editSalaryForm.bankName,
+          accountNumber: editSalaryForm.accountNumber,
+        },
+      }) : null);
+      setShowEditSalary(false);
+    } catch (error) {
+      console.log('Error updating bank info', error);
+    }
   };
 
   const handleLogout = async () => {

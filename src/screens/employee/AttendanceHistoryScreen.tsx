@@ -72,6 +72,13 @@ export default function AttendanceHistoryScreen({ navigation }: AttendanceHistor
             const newMarkedDates: any = {};
             let stats = { present: 0, late: 0, absent: 0, totalHours: 0 };
 
+            // Helper to parse duration string "Xh Ym"
+            const parseDuration = (str: string) => {
+                const h = str.match(/(\d+)h/)?.[1] || '0';
+                const m = str.match(/(\d+)m/)?.[1] || '0';
+                return parseInt(h) * 60 + parseInt(m);
+            };
+
             data.forEach((item: any) => {
                 const date = item.date; // Assuming API returns YYYY-MM-DD
                 let color = COLORS.accent.green;
@@ -88,13 +95,18 @@ export default function AttendanceHistoryScreen({ navigation }: AttendanceHistor
                         status: item.status,
                         checkIn: item.checkIn || '--:--',
                         checkOut: item.checkOut || '--:--',
-                        total: item.hours || '0h'
+                        total: item.hours || '0h 0m'
                     }
                 };
 
                 if (item.status === 'present') stats.present++;
                 if (item.status === 'late') stats.late++;
                 if (item.status === 'absent' || item.status === 'on_leave') stats.absent++;
+
+                // Accumulate total minutes
+                if (item.hours) {
+                    stats.totalHours += parseDuration(item.hours);
+                }
             });
 
             // Ensure marked dates include current selection
@@ -102,10 +114,17 @@ export default function AttendanceHistoryScreen({ navigation }: AttendanceHistor
                 newMarkedDates[selectedDate] = { selected: true };
             }
 
+            // Format total hours back to string
+            const totalH = Math.floor(stats.totalHours / 60);
+            const totalM = stats.totalHours % 60;
+            const totalHoursStr = `${totalH}h ${totalM}m`;
+
             setMarkedDates(newMarkedDates);
             setMonthlyStats({
-                ...stats,
-                totalHours: '0h' // You might want to calculate this if API doesn't provide total for month
+                present: stats.present,
+                late: stats.late,
+                absent: stats.absent,
+                totalHours: totalHoursStr
             });
 
         } catch (error) {

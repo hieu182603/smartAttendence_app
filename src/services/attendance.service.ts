@@ -1,6 +1,11 @@
 import api from '../libs/axios';
 
 export const AttendanceService = {
+    getSchedule: async (month: string) => { // month format: YYYY-MM
+        const response = await api.get(`/attendance/schedule?month=${month}`);
+        return response.data;
+    },
+
     getRecent: async (limit = 5) => {
         const response = await api.get(`/attendance/recent?limit=${limit}`);
         return response.data;

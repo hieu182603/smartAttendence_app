@@ -10,10 +10,11 @@ import {
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Notification } from '../types';
 
 export default function NotificationsScreen() {
+  const navigation = useNavigation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,13 +100,26 @@ export default function NotificationsScreen() {
         }}
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={{ fontSize: 24, fontWeight: '600', color: '#ffffff' }}>
-              Thông báo
-            </Text>
-            <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>
-              Cập nhật mới nhất từ hệ thống
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={{
+                marginRight: SPACING.md,
+                padding: SPACING.xs,
+                borderRadius: BORDER_RADIUS.sm,
+                backgroundColor: 'rgba(255,255,255,0.2)'
+              }}
+            >
+              <Icon name="arrow_back" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <View>
+              <Text style={{ fontSize: 24, fontWeight: '600', color: '#ffffff' }}>
+                Thông báo
+              </Text>
+              <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>
+                Cập nhật mới nhất từ hệ thống
+              </Text>
+            </View>
           </View>
           <TouchableOpacity
             onPress={markAllAsRead}

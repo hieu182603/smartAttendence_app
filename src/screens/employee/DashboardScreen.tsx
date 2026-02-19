@@ -4,16 +4,22 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
+  Image,
+  RefreshControl,
   ActivityIndicator,
   Modal,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { EmployeeTabParamList } from '../../navigation/AppNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
+import { AttendanceService } from '../../services/attendance.service';
+import { LeaveService } from '../../services/leave.service';
+import { NotificationService } from '../../services/notification.service';
 import { AttendanceStats, Activity, Notification } from '../../types';
 
 type DashboardScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Home'>;
@@ -98,67 +104,105 @@ const mockNotifications: Notification[] = [
   },
 ];
 
-export default function DashboardScreen({ navigation }: DashboardScreenProps) {
+export default function DashboardScreen() {
   const { user } = useAuth();
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState(mockNotifications);
-
-  const [stats, setStats] = useState<AttendanceStats>({
-    leavesRemaining: 0,
-    totalLeaves: 12, // Default
-    thisMonth: 0,
-    totalDays: 26, // Approx working days
-    overtimeHours: 0,
-    lateCount: 0,
-  });
-
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const navigation = useNavigation<any>();
+  const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const [stats, setStats] = useState({
+    attendanceLikelihood: 100,
+    leavesRemaining: 0,
+    totalLeaves: 12,
+    overtimeHours: 0,
+    thisMonth: 0,
+    totalDays: 0,
+  });
+
+  const [activities, setActivities] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = async () => {
     try {
-      setIsLoading(true);
-      const { AttendanceService } = await import('../../services/attendance.service');
-      const { LeaveService } = await import('../../services/leave.service');
+      // Parallel fetching for performance
+      const [balance, recentAttendance, notificationsData] = await Promise.all([
+        LeaveService.getBalance().catch(e => ({ annual: { remaining: 0, total: 12 } })), // Fallback if fails
+        AttendanceService.getRecent(5).catch(e => []),
+        NotificationService.getAll({ limit: 3, unreadOnly: true }).catch(e => [])
+      ]);
 
-      // Fetch Leave Balance
-      try {
-        const balance = await LeaveService.getBalance();
-        setStats(prev => ({
-          ...prev,
-          leavesRemaining: balance.annual?.remaining || 0,
-          totalLeaves: balance.annual?.total || 12,
-        }));
-      } catch (e) {
-        console.log('Error fetching leave balance', e);
-      }
+      // Update Stats
+      setStats(prev => ({
+        ...prev,
+        leavesRemaining: balance.annual?.remaining || 0,
+        totalLeaves: balance.annual?.total || 12,
+        // Overtime and Likelihood would typically come from another API summary endpoint
+        // For now, keeping defaults or plausible values until that endpoint exists
+      }));
 
-      // Fetch Recent Activity
-      try {
-        const recent = await AttendanceService.getRecent(5);
-        const mappedActivities = recent.map((item: any) => ({
-          id: item._id || Math.random().toString(),
-          userId: user?.id,
-          action: item.checkOut ? 'Chấm công ra' : 'Chấm công vào',
-          time: item.checkOut ? item.checkOut : item.checkIn, // This needs formatting
-          date: item.date,
-          timestamp: new Date(item.date).getTime(),
-          status: item.status === 'late' ? 'warning' : 'success',
-          details: item.location,
+      // Update Activities
+      const mappedActivities = recentAttendance.map((item: any) => ({
+        id: item._id,
+        type: item.checkOutTime ? 'check-out' : 'check-in',
+        time: item.checkOutTime
+          ? new Date(item.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : new Date(item.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: new Date(item.checkInTime).toLocaleDateString(),
+        status: item.status === 'LATE' ? 'warning' : 'success',
+        title: item.checkOutTime ? 'Check-out' : 'Check-in thành công',
+        subtitle: item.checkOutTime ? 'Hoàn thành ca làm việc' : 'Bắt đầu ca làm việc',
+      }));
+      setActivities(mappedActivities);
+
+      // Update Notifications
+      if (Array.isArray(notificationsData)) {
+        const mappedNotifications = notificationsData.map((item: any) => ({
+          id: item._id,
+          type: item.type,
+          title: item.title,
+          message: item.message,
+          time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          unread: !item.isRead,
+          icon: item.type === 'approved' ? 'check_circle' :
+            item.type === 'rejected' ? 'cancel' :
+              item.type === 'reminder' ? 'alarm' : 'info',
         }));
-        setActivities(mappedActivities);
-      } catch (e) {
-        console.log('Error fetching recent attendance', e);
+        setNotifications(mappedNotifications);
       }
 
     } catch (error) {
-      console.error('Dashboard fetch error:', error);
+      console.log('Error fetching dashboard data', error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+    }, [])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchDashboardData();
+  }, []);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Chào buổi sáng';
+    if (hour < 18) return 'Chào buổi chiều';
+    return 'Chào buổi tối';
+  };
+
+  const getNotificationBg = (type: string) => {
+    switch (type) {
+      case 'approved': return { bg: 'rgba(34, 197, 94, 0.1)', icon: COLORS.accent.green };
+      case 'rejected': return { bg: 'rgba(239, 68, 68, 0.1)', icon: COLORS.accent.red };
+      case 'warning': return { bg: 'rgba(245, 158, 11, 0.1)', icon: COLORS.accent.yellow };
+      default: return { bg: 'rgba(66, 69, 240, 0.1)', icon: COLORS.primary };
     }
   };
 
@@ -167,24 +211,8 @@ export default function DashboardScreen({ navigation }: DashboardScreenProps) {
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Chào buổi sáng! 👋' : hour < 18 ? 'Chào buổi chiều! 👋' : 'Chào buổi tối! 👋';
+  const greeting = getGreeting();
 
-
-  const getNotificationBg = (type: Notification['type']) => {
-    switch (type) {
-      case 'approved':
-        return { bg: 'rgba(34, 197, 94, 0.2)', border: 'rgba(34, 197, 94, 0.3)' };
-      case 'rejected':
-        return { bg: 'rgba(239, 68, 68, 0.2)', border: 'rgba(239, 68, 68, 0.3)' };
-      case 'reminder':
-        return { bg: 'rgba(245, 158, 11, 0.2)', border: 'rgba(245, 158, 11, 0.3)' };
-      case 'warning':
-        return { bg: 'rgba(239, 68, 68, 0.2)', border: 'rgba(239, 68, 68, 0.3)' };
-      default:
-        return { bg: 'rgba(66, 69, 240, 0.2)', border: 'rgba(66, 69, 240, 0.3)' };
-    }
-  };
 
   // Check In/Out State
   const [isProcessing, setIsProcessing] = useState(false);
