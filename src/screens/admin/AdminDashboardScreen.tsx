@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { AdminDrawerParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
+import { AdminService } from '../../services/admin.service';
 
 type AdminDashboardScreenNavigationProp = DrawerNavigationProp<AdminDrawerParamList, 'AdminDashboard'>;
 
@@ -12,15 +13,57 @@ interface AdminDashboardScreenProps {
   navigation: AdminDashboardScreenNavigationProp;
 }
 
+interface DashboardStats {
+  totalUsers: number;
+  activeUsers: number;
+  uptime: string;
+  serverStatus: string;
+  cpuUsage: string;
+  memoryUsage: string;
+  storageUsage: string;
+}
+
 const { width } = Dimensions.get('window');
 
 export default function AdminDashboardScreen({ navigation }: AdminDashboardScreenProps) {
   const [now, setNow] = useState(new Date());
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchStats = async () => {
+    try {
+      setIsLoading(true);
+      const data = await AdminService.getDashboardStats();
+      setStats(data);
+    } catch (error) {
+      console.log('Error fetching dashboard stats', error);
+      // Fallback to defaults if API fails
+      setStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        uptime: '99.9%',
+        serverStatus: 'Healthy',
+        cpuUsage: '0%',
+        memoryUsage: '0%',
+        storageUsage: '0%'
+      });
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
+    fetchStats();
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchStats();
+  };
 
   const hours = now.getHours().toString().padStart(2, '0');
   const minutes = now.getMinutes().toString().padStart(2, '0');
@@ -31,6 +74,9 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
       style={globalStyles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 100 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" />
+      }
     >
       {/* Header Gradient - Admin Purple/Indigo */}
       <LinearGradient
@@ -78,7 +124,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                   fontWeight: '500',
                 }}
               >
-                System Admin
+                Quản trị hệ thống
               </Text>
               <Text
                 style={{
@@ -136,7 +182,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
               marginTop: SPACING.xs,
             }}
           >
-            System Operational
+            Hệ thống đang hoạt động
           </Text>
         </View>
       </LinearGradient>
@@ -154,167 +200,173 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
             borderColor: 'rgba(255, 255, 255, 0.05)',
           }}
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: SPACING.lg,
-            }}
-          >
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                backgroundColor: 'rgba(11, 218, 104, 0.2)',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: SPACING.md,
-                position: 'relative',
-              }}
-            >
-              <Icon name="dns" size={24} color={COLORS.accent.green} />
+          {isLoading && !refreshing ? (
+            <ActivityIndicator color={COLORS.primary} size="small" />
+          ) : (
+            <>
               <View
                 style={{
-                  position: 'absolute',
-                  top: 0,
-                  right: 0,
-                  width: 12,
-                  height: 12,
-                  borderRadius: 6,
-                  backgroundColor: COLORS.accent.green,
-                  borderWidth: 2,
-                  borderColor: COLORS.surface.dark,
-                }}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  color: '#ffffff',
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  marginBottom: SPACING.xs / 2,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: SPACING.lg,
                 }}
               >
-                99.9% Uptime
-              </Text>
-              <Text
-                style={{
-                  color: COLORS.text.secondary,
-                  fontSize: 14,
-                }}
-              >
-                Server status: <Text style={{ color: COLORS.accent.green }}>Healthy</Text>
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('AdminAudit')}
-              style={{
-                backgroundColor: 'rgba(66, 69, 240, 0.1)',
-                paddingHorizontal: SPACING.md,
-                paddingVertical: SPACING.sm,
-                borderRadius: BORDER_RADIUS.md,
-                borderWidth: 1,
-                borderColor: 'rgba(66, 69, 240, 0.2)',
-              }}
-            >
-              <Text
-                style={{
-                  color: COLORS.primary,
-                  fontSize: 12,
-                  fontWeight: 'bold',
-                }}
-              >
-                Logs
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: 'rgba(11, 218, 104, 0.2)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginRight: SPACING.md,
+                    position: 'relative',
+                  }}
+                >
+                  <Icon name="dns" size={24} color={COLORS.accent.green} />
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: COLORS.accent.green,
+                      borderWidth: 2,
+                      borderColor: COLORS.surface.dark,
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: '#ffffff',
+                      fontSize: 18,
+                      fontWeight: 'bold',
+                      marginBottom: SPACING.xs / 2,
+                    }}
+                  >
+                    {stats?.uptime || '99.9%'} Uptime
+                  </Text>
+                  <Text
+                    style={{
+                      color: COLORS.text.secondary,
+                      fontSize: 14,
+                    }}
+                  >
+                    Server status: <Text style={{ color: COLORS.accent.green }}>{stats?.serverStatus || 'Healthy'}</Text>
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('AdminAudit')}
+                  style={{
+                    backgroundColor: 'rgba(66, 69, 240, 0.1)',
+                    paddingHorizontal: SPACING.md,
+                    paddingVertical: SPACING.sm,
+                    borderRadius: BORDER_RADIUS.md,
+                    borderWidth: 1,
+                    borderColor: 'rgba(66, 69, 240, 0.2)',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: COLORS.primary,
+                      fontSize: 12,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    Logs
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-          {/* System Stats */}
-          <View
-            style={{
-              flexDirection: 'row',
-              paddingTop: SPACING.md,
-              borderTopWidth: 1,
-              borderTopColor: 'rgba(255, 255, 255, 0.05)',
-            }}
-          >
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text
+              {/* System Stats */}
+              <View
                 style={{
-                  color: COLORS.text.secondary,
-                  fontSize: 12,
-                  marginBottom: SPACING.xs,
+                  flexDirection: 'row',
+                  paddingTop: SPACING.md,
+                  borderTopWidth: 1,
+                  borderTopColor: 'rgba(255, 255, 255, 0.05)',
                 }}
               >
-                CPU
-              </Text>
-              <Text
-                style={{
-                  color: '#ffffff',
-                  fontSize: 16,
-                  fontWeight: 'bold',
-                }}
-              >
-                12%
-              </Text>
-            </View>
-            <View
-              style={{
-                width: 1,
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                marginHorizontal: SPACING.md,
-              }}
-            />
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text
-                style={{
-                  color: COLORS.text.secondary,
-                  fontSize: 12,
-                  marginBottom: SPACING.xs,
-                }}
-              >
-                Memory
-              </Text>
-              <Text
-                style={{
-                  color: '#ffffff',
-                  fontSize: 16,
-                  fontWeight: 'bold',
-                }}
-              >
-                45%
-              </Text>
-            </View>
-            <View
-              style={{
-                width: 1,
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                marginHorizontal: SPACING.md,
-              }}
-            />
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text
-                style={{
-                  color: COLORS.text.secondary,
-                  fontSize: 12,
-                  marginBottom: SPACING.xs,
-                }}
-              >
-                Storage
-              </Text>
-              <Text
-                style={{
-                  color: '#ffffff',
-                  fontSize: 16,
-                  fontWeight: 'bold',
-                }}
-              >
-                28%
-              </Text>
-            </View>
-          </View>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text
+                    style={{
+                      color: COLORS.text.secondary,
+                      fontSize: 12,
+                      marginBottom: SPACING.xs,
+                    }}
+                  >
+                    CPU
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#ffffff',
+                      fontSize: 16,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {stats?.cpuUsage || '--'}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    width: 1,
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    marginHorizontal: SPACING.md,
+                  }}
+                />
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text
+                    style={{
+                      color: COLORS.text.secondary,
+                      fontSize: 12,
+                      marginBottom: SPACING.xs,
+                    }}
+                  >
+                    Memory
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#ffffff',
+                      fontSize: 16,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {stats?.memoryUsage || '--'}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    width: 1,
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    marginHorizontal: SPACING.md,
+                  }}
+                />
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text
+                    style={{
+                      color: COLORS.text.secondary,
+                      fontSize: 12,
+                      marginBottom: SPACING.xs,
+                    }}
+                  >
+                    Storage
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#ffffff',
+                      fontSize: 16,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {stats?.storageUsage || '--'}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
 
         {/* User Stats Grid */}
@@ -355,7 +407,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                 marginBottom: SPACING.xs,
               }}
             >
-              Total Users
+              Tổng người dùng
             </Text>
             <Text
               style={{
@@ -364,7 +416,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                 fontWeight: 'bold',
               }}
             >
-              48
+              {stats?.totalUsers || '--'}
             </Text>
           </TouchableOpacity>
 
@@ -398,7 +450,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                 marginBottom: SPACING.xs,
               }}
             >
-              Analytics
+              Phân tích
             </Text>
             <Text
               style={{
@@ -407,7 +459,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                 fontWeight: 'bold',
               }}
             >
-              Reports
+              Báo cáo
             </Text>
           </TouchableOpacity>
         </View>

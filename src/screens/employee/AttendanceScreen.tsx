@@ -147,7 +147,7 @@ export default function AttendanceScreen({ navigation, route }: AttendanceScreen
             >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconButton}>
-                        <Icon name="arrow_back" size={24} color="#fff" />
+                        <Icon name="close" size={24} color="#fff" />
                     </TouchableOpacity>
                     <Text style={globalStyles.heading3}>
                         {mode === 'check-in' ? 'Chấm công vào' : 'Chấm công ra'}
@@ -202,7 +202,8 @@ export default function AttendanceScreen({ navigation, route }: AttendanceScreen
                         <ActivityIndicator size="small" color="#fff" />
                     ) : (
                         <View style={styles.captureInner}>
-                            <Icon name={mode === 'check-in' ? "login" : "logout"} size={28} color="#fff" />
+                            {/* Make icon larger and ensure it centers visually */}
+                            <Icon name={mode === 'check-in' ? "face" : "logout"} size={32} color="#fff" />
                         </View>
                     )}
                 </TouchableOpacity>
@@ -238,24 +239,26 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 5,
+        paddingBottom: 200, // Offset for footer
     },
     faceGuideBox: {
         width: width * 0.7,
         height: width * 0.7 * 1.3, // Aspect ratio roughly 3:4
         borderWidth: 2,
-        borderColor: 'rgba(255, 255, 255, 0.5)',
-        borderRadius: 20,
+        borderColor: 'rgba(255, 255, 255, 0.8)', // Brighter border
+        borderRadius: 24,
         backgroundColor: 'transparent',
     },
     faceGuideText: {
+        position: 'absolute',
+        top: -40, // Move text above the box
         color: '#fff',
-        marginTop: SPACING.md,
         fontSize: 16,
-        fontWeight: '500',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
+        fontWeight: '600',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
         overflow: 'hidden',
     },
     footer: {

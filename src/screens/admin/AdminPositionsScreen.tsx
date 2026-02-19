@@ -8,6 +8,8 @@ import {
     TextInput,
     StyleSheet,
     Alert,
+    ActivityIndicator,
+    RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -23,7 +25,7 @@ interface AdminPositionsScreenProps {
 }
 
 interface Position {
-    id: string;
+    _id: string; // Updated to match MongoDB _id convention
     title: string;
     level: number;
 }
@@ -31,6 +33,7 @@ interface Position {
 export default function AdminPositionsScreen({ navigation }: AdminPositionsScreenProps) {
     const [positions, setPositions] = useState<Position[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingPos, setEditingPos] = useState<Position | null>(null);
 
@@ -46,13 +49,19 @@ export default function AdminPositionsScreen({ navigation }: AdminPositionsScree
         try {
             setIsLoading(true);
             const data = await AdminService.getPositions();
-            setPositions(data);
+            setPositions(data || []);
         } catch (error) {
             console.error('Error loading positions', error);
-            Alert.alert('Error', 'Failed to load positions');
+            Alert.alert('Lỗi', 'Không thể tải danh sách chức vụ');
         } finally {
             setIsLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const handleRefresh = () => {
+        setRefreshing(true);
+        loadPositions();
     };
 
     const handleEdit = (pos: Position) => {
@@ -70,42 +79,70 @@ export default function AdminPositionsScreen({ navigation }: AdminPositionsScree
     };
 
     const handleDelete = (id: string) => {
-        Alert.alert('Info', 'Chức năng xóa chưa được cập nhật trong bản demo');
+        Alert.alert(
+            'Xóa chức vụ',
+            'Bạn có chắc chắn muốn xóa chức vụ này?',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Xóa',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setIsLoading(true);
+                            await AdminService.deletePosition(id);
+                            loadPositions();
+                        } catch (error: any) {
+                            Alert.alert('Lỗi', error.response?.data?.message || 'Không thể xóa chức vụ');
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    }
+                },
+            ]
+        );
     };
 
     const handleSave = async () => {
         if (!title.trim()) {
-            Alert.alert('Error', 'Tên chức vụ không được để trống');
+            Alert.alert('Lỗi', 'Tên chức vụ không được để trống');
             return;
         }
 
-        // Mock save
-        const newPos = {
-            id: editingPos ? editingPos.id : `pos-${Date.now()}`,
-            title,
-            level: parseInt(level) || 0
-        };
+        try {
+            setIsLoading(true);
+            const data = {
+                title: title.trim(),
+                level: parseInt(level) || 0
+            };
 
-        if (editingPos) {
-            setPositions(prev => prev.map(p => p.id === newPos.id ? newPos : p));
-        } else {
-            setPositions(prev => [...prev, newPos]);
+            if (editingPos) {
+                await AdminService.updatePosition(editingPos._id, data);
+            } else {
+                await AdminService.createPosition(data);
+            }
+
+            setModalVisible(false);
+            loadPositions();
+        } catch (error: any) {
+            console.error('Error saving position', error);
+            Alert.alert('Lỗi', error.response?.data?.message || 'Không thể lưu chức vụ');
+        } finally {
+            setIsLoading(false);
         }
-
-        setModalVisible(false);
     };
 
     const renderItem = ({ item }: { item: Position }) => (
         <View style={styles.card}>
             <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardSubtitle}>Level: {item.level}</Text>
+                <Text style={styles.cardSubtitle}>Cấp bậc (Level): {item.level}</Text>
             </View>
             <View style={{ flexDirection: 'row' }}>
                 <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
                     <Icon name="edit" size={20} color={COLORS.primary} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.actionButton}>
+                <TouchableOpacity onPress={() => handleDelete(item._id)} style={styles.actionButton}>
                     <Icon name="delete" size={20} color={COLORS.accent.red} />
                 </TouchableOpacity>
             </View>
@@ -134,14 +171,26 @@ export default function AdminPositionsScreen({ navigation }: AdminPositionsScree
                 </View>
             </LinearGradient>
 
-            <FlatList
-                data={positions}
-                renderItem={renderItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={{ padding: SPACING.md }}
-                refreshing={isLoading}
-                onRefresh={loadPositions}
-            />
+            {isLoading && !refreshing && positions.length === 0 ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+            ) : (
+                <FlatList
+                    data={positions}
+                    renderItem={renderItem}
+                    keyExtractor={item => item._id}
+                    contentContainerStyle={{ padding: SPACING.md }}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} />
+                    }
+                    ListEmptyComponent={
+                        <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
+                            <Text style={{ color: COLORS.text.secondary }}>Chưa có chức vụ nào</Text>
+                        </View>
+                    }
+                />
+            )}
 
             {/* Modal */}
             <Modal
@@ -156,7 +205,7 @@ export default function AdminPositionsScreen({ navigation }: AdminPositionsScree
                             {editingPos ? 'Sửa Chức Vụ' : 'Thêm Chức Vụ'}
                         </Text>
 
-                        <Text style={styles.label}>Tên chức vụ</Text>
+                        <Text style={styles.label}>Tên chức vụ <Text style={{ color: COLORS.accent.red }}>*</Text></Text>
                         <TextInput
                             style={styles.input}
                             value={title}
@@ -165,7 +214,7 @@ export default function AdminPositionsScreen({ navigation }: AdminPositionsScree
                             placeholderTextColor={COLORS.text.secondary}
                         />
 
-                        <Text style={styles.label}>Level (Cấp bậc)</Text>
+                        <Text style={styles.label}>Cấp bậc (Level)</Text>
                         <TextInput
                             style={styles.input}
                             value={level}
@@ -185,8 +234,13 @@ export default function AdminPositionsScreen({ navigation }: AdminPositionsScree
                             <TouchableOpacity
                                 style={[styles.modalButton, { backgroundColor: COLORS.primary }]}
                                 onPress={handleSave}
+                                disabled={isLoading}
                             >
-                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Lưu</Text>
+                                {isLoading ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Lưu</Text>
+                                )}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -280,5 +334,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.lg,
         borderRadius: BORDER_RADIUS.md,
         marginLeft: SPACING.md,
+        minWidth: 80,
+        alignItems: 'center',
+        justifyContent: 'center'
     },
 });

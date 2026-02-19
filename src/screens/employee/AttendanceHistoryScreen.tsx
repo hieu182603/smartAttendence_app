@@ -21,13 +21,6 @@ interface AttendanceHistoryScreenProps {
     navigation: AttendanceHistoryScreenNavigationProp;
 }
 
-// Mock data for initial development if API fails
-const MOCK_ATTENDANCE: Record<string, any> = {
-    '2024-01-15': { status: 'present', checkIn: '08:25', checkOut: '17:35', total: '9h 10m' },
-    '2024-01-16': { status: 'late', checkIn: '09:15', checkOut: '17:30', total: '8h 15m' },
-    '2024-01-17': { status: 'absent', checkIn: '--:--', checkOut: '--:--', total: '0h 00m' },
-    '2024-01-18': { status: 'present', checkIn: '08:30', checkOut: '17:30', total: '9h 00m' },
-};
 
 export default function AttendanceHistoryScreen({ navigation }: AttendanceHistoryScreenProps) {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);

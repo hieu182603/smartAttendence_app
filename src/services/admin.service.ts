@@ -33,6 +33,21 @@ export const AdminService = {
         }
     },
 
+    createPosition: async (data: { title: string; level: number }) => {
+        const response = await api.post('/positions', data);
+        return response.data;
+    },
+
+    updatePosition: async (id: string, data: { title: string; level: number }) => {
+        const response = await api.put(`/positions/${id}`, data);
+        return response.data;
+    },
+
+    deletePosition: async (id: string) => {
+        const response = await api.delete(`/positions/${id}`);
+        return response.data;
+    },
+
     // Utils for dropdowns
     getManagers: async () => {
         const response = await api.get('/users/managers');
@@ -42,6 +57,18 @@ export const AdminService = {
     getBranches: async () => {
         const response = await api.get('/branches/list');
         return response.data; // Assuming array of branches
+    },
+
+    // Users
+    getUsers: async (params?: { role?: string; status?: string; search?: string }) => {
+        const response = await api.get('/users', { params });
+        return response.data.users || response.data;
+    },
+
+    // Dashboard Stats
+    getDashboardStats: async () => {
+        const response = await api.get('/admin/stats');
+        return response.data;
     },
 
     // Settings

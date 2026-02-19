@@ -35,6 +35,7 @@ export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const [stats, setStats] = useState({
     attendanceLikelihood: 100,
@@ -111,14 +112,21 @@ export default function DashboardScreen() {
       console.log('Error fetching dashboard data', error);
     } finally {
       setLoading(false);
+      setIsLoading(false);
       setRefreshing(false);
+      setHasLoadedOnce(true);
     }
   };
 
+  // Only show full loading spinner on first load
+  // On subsequent tab switches, fetch silently in background
   useFocusEffect(
     useCallback(() => {
+      if (!hasLoadedOnce) {
+        setIsLoading(true);
+      }
       fetchDashboardData();
-    }, [])
+    }, [hasLoadedOnce])
   );
 
   const onRefresh = useCallback(() => {

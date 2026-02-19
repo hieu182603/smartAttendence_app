@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
@@ -13,6 +15,7 @@ import { AdminDrawerParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { UserRole } from '../../types';
+import { AdminService } from '../../services/admin.service';
 
 type AdminUsersScreenNavigationProp = DrawerNavigationProp<AdminDrawerParamList, 'AdminUsers'>;
 
@@ -21,74 +24,52 @@ interface AdminUsersScreenProps {
 }
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   role: UserRole;
   status: 'active' | 'inactive';
-  avatar: string;
-  lastActive: string;
+  avatar?: string;
+  lastActive?: string;
+  createdAt?: string;
 }
-
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'Alex Johnson',
-    email: 'alex.j@company.com',
-    role: UserRole.Employee,
-    status: 'active',
-    avatar: 'AJ',
-    lastActive: '2 hours ago',
-  },
-  {
-    id: '2',
-    name: 'Sarah Chen',
-    email: 'sarah.c@company.com',
-    role: UserRole.Manager,
-    status: 'active',
-    avatar: 'SC',
-    lastActive: '5 minutes ago',
-  },
-  {
-    id: '3',
-    name: 'Michael Brown',
-    email: 'michael.b@company.com',
-    role: UserRole.Employee,
-    status: 'active',
-    avatar: 'MB',
-    lastActive: '1 day ago',
-  },
-  {
-    id: '4',
-    name: 'Emily Davis',
-    email: 'emily.d@company.com',
-    role: UserRole.Employee,
-    status: 'inactive',
-    avatar: 'ED',
-    lastActive: '3 days ago',
-  },
-  {
-    id: '5',
-    name: 'David Wilson',
-    email: 'david.w@company.com',
-    role: UserRole.Manager,
-    status: 'active',
-    avatar: 'DW',
-    lastActive: '30 minutes ago',
-  },
-];
 
 export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | UserRole>('all');
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const filteredUsers = mockUsers.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = selectedFilter === 'all' || user.role === selectedFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      const data = await AdminService.getUsers({
+        role: selectedFilter === 'all' ? undefined : selectedFilter,
+        search: searchQuery || undefined,
+      });
+      setUsers(data || []);
+    } catch (error) {
+      console.log('Error fetching users', error);
+      setUsers([]);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [selectedFilter]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchUsers();
+  };
+
+  const handleSearch = () => {
+    fetchUsers();
+  };
 
   const getRoleColor = (role: UserRole) => {
     switch (role) {
@@ -106,9 +87,9 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
       case UserRole.Admin:
         return 'Admin';
       case UserRole.Manager:
-        return 'Manager';
+        return 'Quản lý';
       default:
-        return 'Employee';
+        return 'Nhân viên';
     }
   };
 
@@ -117,6 +98,9 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
       style={globalStyles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 100 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" />
+      }
     >
       {/* Header */}
       <LinearGradient
@@ -160,7 +144,7 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
               flex: 1,
             }}
           >
-            User Management
+            Quản lý người dùng
           </Text>
           <TouchableOpacity
             style={{
@@ -172,7 +156,7 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
               alignItems: 'center',
             }}
           >
-            <Icon name="add" size={24} color="#ffffff" />
+            <Icon name="person_add" size={24} color="#ffffff" />
           </TouchableOpacity>
         </View>
 
@@ -197,10 +181,11 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
               marginLeft: SPACING.sm,
               padding: 0,
             }}
-            placeholder="Search users..."
+            placeholder="Tìm kiếm người dùng..."
             placeholderTextColor="rgba(255, 255, 255, 0.5)"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -237,7 +222,7 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
                   fontWeight: selectedFilter === filter ? 'bold' : '500',
                 }}
               >
-                {filter === 'all' ? 'All' : getRoleLabel(filter)}
+                {filter === 'all' ? 'Tất cả' : getRoleLabel(filter)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -246,156 +231,169 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
 
       {/* User List */}
       <View style={{ padding: SPACING.xl }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: SPACING.md,
-          }}
-        >
-          <Text
-            style={{
-              color: COLORS.text.secondary,
-              fontSize: 14,
-              fontWeight: '500',
-            }}
-          >
-            {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'}
-          </Text>
-        </View>
-
-        {filteredUsers.map((user) => (
-          <TouchableOpacity
-            key={user.id}
-            style={{
-              backgroundColor: 'rgba(30, 31, 58, 0.6)',
-              borderRadius: BORDER_RADIUS.lg,
-              padding: SPACING.lg,
-              marginBottom: SPACING.md,
-              ...SHADOWS.md,
-              borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.05)',
-            }}
-          >
+        {isLoading && !refreshing ? (
+          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: SPACING.xxl }} />
+        ) : (
+          <>
             <View
               style={{
                 flexDirection: 'row',
+                justifyContent: 'space-between',
                 alignItems: 'center',
+                marginBottom: SPACING.md,
               }}
             >
-              {/* Avatar */}
-              <View
+              <Text
                 style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 25,
-                  backgroundColor: getRoleColor(user.role),
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: SPACING.md,
+                  color: COLORS.text.secondary,
+                  fontSize: 14,
+                  fontWeight: '500',
                 }}
               >
-                <Text
-                  style={{
-                    color: '#ffffff',
-                    fontSize: 18,
-                    fontWeight: 'bold',
-                  }}
-                >
-                  {user.avatar}
-                </Text>
-              </View>
+                {users.length} người dùng
+              </Text>
+            </View>
 
-              {/* User Info */}
-              <View style={{ flex: 1 }}>
-                <View
+            {users.length === 0 ? (
+              <View style={{ alignItems: 'center', marginTop: SPACING.xxl }}>
+                <Icon name="person_off" size={60} color={COLORS.text.secondary} />
+                <Text style={{ color: COLORS.text.secondary, marginTop: SPACING.md }}>Không tìm thấy người dùng nào</Text>
+              </View>
+            ) : (
+              users.map((user) => (
+                <TouchableOpacity
+                  key={user._id}
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginBottom: SPACING.xs / 2,
+                    backgroundColor: 'rgba(30, 31, 58, 0.6)',
+                    borderRadius: BORDER_RADIUS.lg,
+                    padding: SPACING.lg,
+                    marginBottom: SPACING.md,
+                    ...SHADOWS.md,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.05)',
                   }}
                 >
-                  <Text
-                    style={{
-                      color: '#ffffff',
-                      fontSize: 16,
-                      fontWeight: 'bold',
-                      marginRight: SPACING.sm,
-                    }}
-                  >
-                    {user.name}
-                  </Text>
                   <View
                     style={{
-                      paddingHorizontal: SPACING.xs,
-                      paddingVertical: 2,
-                      borderRadius: BORDER_RADIUS.sm,
-                      backgroundColor: `${getRoleColor(user.role)}20`,
-                      borderWidth: 1,
-                      borderColor: `${getRoleColor(user.role)}40`,
+                      flexDirection: 'row',
+                      alignItems: 'center',
                     }}
                   >
-                    <Text
+                    {/* Avatar */}
+                    <View
                       style={{
-                        color: getRoleColor(user.role),
-                        fontSize: 10,
-                        fontWeight: 'bold',
+                        width: 50,
+                        height: 50,
+                        borderRadius: 25,
+                        backgroundColor: getRoleColor(user.role),
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginRight: SPACING.md,
                       }}
                     >
-                      {getRoleLabel(user.role)}
-                    </Text>
-                  </View>
-                </View>
-                <Text
-                  style={{
-                    color: COLORS.text.secondary,
-                    fontSize: 12,
-                    marginBottom: SPACING.xs / 2,
-                  }}
-                >
-                  {user.email}
-                </Text>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor:
-                        user.status === 'active'
-                          ? COLORS.accent.green
-                          : COLORS.text.secondary,
-                      marginRight: SPACING.xs,
-                    }}
-                  />
-                  <Text
-                    style={{
-                      color: COLORS.text.secondary,
-                      fontSize: 11,
-                    }}
-                  >
-                    {user.status === 'active' ? 'Active' : 'Inactive'} • {user.lastActive}
-                  </Text>
-                </View>
-              </View>
+                      <Text
+                        style={{
+                          color: '#ffffff',
+                          fontSize: 18,
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        {user.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
 
-              {/* Actions */}
-              <TouchableOpacity
-                style={{
-                  padding: SPACING.sm,
-                }}
-              >
-                <Icon name="more_vert" size={20} color={COLORS.text.secondary} />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        ))}
+                    {/* User Info */}
+                    <View style={{ flex: 1 }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          marginBottom: SPACING.xs / 2,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: '#ffffff',
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                            marginRight: SPACING.sm,
+                          }}
+                        >
+                          {user.name}
+                        </Text>
+                        <View
+                          style={{
+                            paddingHorizontal: SPACING.xs,
+                            paddingVertical: 2,
+                            borderRadius: BORDER_RADIUS.sm,
+                            backgroundColor: `${getRoleColor(user.role)}20`,
+                            borderWidth: 1,
+                            borderColor: `${getRoleColor(user.role)}40`,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: getRoleColor(user.role),
+                              fontSize: 10,
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {getRoleLabel(user.role)}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text
+                        style={{
+                          color: COLORS.text.secondary,
+                          fontSize: 12,
+                          marginBottom: SPACING.xs / 2,
+                        }}
+                      >
+                        {user.email}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor:
+                              user.status === 'active'
+                                ? COLORS.accent.green
+                                : COLORS.text.secondary,
+                            marginRight: SPACING.xs,
+                          }}
+                        />
+                        <Text
+                          style={{
+                            color: COLORS.text.secondary,
+                            fontSize: 11,
+                          }}
+                        >
+                          {user.status === 'active' ? 'Hoạt động' : 'Tạm ngưng'} {user.lastActive ? `• ${user.lastActive}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Actions */}
+                    <TouchableOpacity
+                      style={{
+                        padding: SPACING.sm,
+                      }}
+                    >
+                      <Icon name="more_vert" size={20} color={COLORS.text.secondary} />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </>
+        )}
       </View>
     </ScrollView>
   );
