@@ -6,6 +6,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { globalStyles } from './src/utils/styles';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { SocketProvider } from './src/context/SocketContext';
+import { PreferencesProvider } from './src/context/PreferencesContext';
 
 function AppContent() {
   const { userRole, isLoading } = useAuth();
@@ -24,14 +25,16 @@ function AppContent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <SocketProvider>
-          <View style={globalStyles.container}>
-            <StatusBar style="light" backgroundColor="#101122" />
-            <AppContent />
-          </View>
-        </SocketProvider>
-      </AuthProvider>
+      <PreferencesProvider>
+        <AuthProvider>
+          <SocketProvider>
+            <View style={globalStyles.container}>
+              <StatusBar style="light" backgroundColor="#101122" />
+              <AppContent />
+            </View>
+          </SocketProvider>
+        </AuthProvider>
+      </PreferencesProvider>
     </SafeAreaProvider>
   );
 }

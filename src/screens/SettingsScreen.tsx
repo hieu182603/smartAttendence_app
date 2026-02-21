@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
+import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../utils/styles';
+import { useTranslation } from '../i18n';
 import { Icon } from '../components/Icon';
+import { usePreferences } from '../context/PreferencesContext';
 
 type Language = 'vi' | 'en';
 
@@ -28,12 +30,17 @@ const LANGUAGES: LanguageOption[] = [
 
 export default function SettingsScreen() {
     const navigation = useNavigation();
+    const theme = useTheme();
+    const { t } = useTranslation();
 
-    // Settings state
-    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [darkMode, setDarkMode] = useState(true);
-    const [biometricEnabled, setBiometricEnabled] = useState(false);
-    const [language, setLanguage] = useState<Language>('vi');
+    // Use global preferences
+    const {
+        isDarkMode, toggleDarkMode,
+        notificationsEnabled, toggleNotifications,
+        biometricEnabled, toggleBiometric,
+        language, setLanguage
+    } = usePreferences();
+
     const [showLanguagePicker, setShowLanguagePicker] = useState(false);
 
     const handleGoBack = () => {
@@ -42,20 +49,20 @@ export default function SettingsScreen() {
 
     const handleClearCache = () => {
         Alert.alert(
-            'Xóa bộ nhớ đệm',
-            'Bạn có chắc chắn muốn xóa tất cả dữ liệu cache? Điều này có thể khiến ứng dụng tải chậm hơn trong lần sử dụng tiếp theo.',
+            t.settings.clearCache,
+            t.settings.clearCacheConfirm,
             [
                 {
-                    text: 'Hủy',
+                    text: t.common.cancel,
                     style: 'cancel',
                 },
                 {
-                    text: 'Xóa',
+                    text: t.common.delete,
                     style: 'destructive',
                     onPress: () => {
                         // Simulate cache clearing
                         setTimeout(() => {
-                            Alert.alert('Thành công', 'Đã xóa bộ nhớ đệm thành công.');
+                            Alert.alert(t.settings.clearCacheSuccess, t.settings.clearCacheSuccessMsg);
                         }, 500);
                     },
                 },
@@ -66,7 +73,7 @@ export default function SettingsScreen() {
     const selectedLanguage = LANGUAGES.find(l => l.code === language);
 
     return (
-        <View style={globalStyles.container}>
+        <View style={[globalStyles.container, { backgroundColor: theme.background }]}>
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 100 }}
@@ -110,7 +117,7 @@ export default function SettingsScreen() {
                                 color: '#ffffff',
                             }}
                         >
-                            Cài đặt
+                            {t.settings.title}
                         </Text>
                     </View>
                     <Text
@@ -119,7 +126,7 @@ export default function SettingsScreen() {
                             color: 'rgba(255, 255, 255, 0.8)',
                         }}
                     >
-                        Tùy chỉnh ứng dụng theo sở thích của bạn
+                        {t.settings.subtitle}
                     </Text>
                 </LinearGradient>
 
@@ -128,11 +135,11 @@ export default function SettingsScreen() {
                     {/* Notifications Section */}
                     <View
                         style={{
-                            backgroundColor: COLORS.surface.dark,
+                            backgroundColor: theme.surface,
                             borderRadius: BORDER_RADIUS.xl,
                             padding: SPACING.md,
                             borderWidth: 1,
-                            borderColor: 'rgba(148, 163, 184, 0.1)',
+                            borderColor: theme.cardBorder,
                             marginBottom: SPACING.lg,
                             ...SHADOWS.lg,
                         }}
@@ -141,11 +148,11 @@ export default function SettingsScreen() {
                             style={{
                                 fontSize: 14,
                                 fontWeight: '600',
-                                color: COLORS.text.primary,
+                                color: theme.text.primary,
                                 marginBottom: SPACING.md,
                             }}
                         >
-                            Thông báo
+                            {t.settings.notifications}
                         </Text>
 
                         {/* Push Notifications */}
@@ -180,17 +187,17 @@ export default function SettingsScreen() {
                                             marginBottom: SPACING.xs / 2,
                                         }}
                                     >
-                                        Thông báo đẩy
+                                        {t.settings.pushNotifications}
                                     </Text>
                                     <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                                        Nhận thông báo về lịch làm việc và phê duyệt
+                                        {t.settings.pushNotificationsDesc}
                                     </Text>
                                 </View>
                             </View>
                             <Switch
                                 value={notificationsEnabled}
-                                onValueChange={setNotificationsEnabled}
-                                trackColor={{ false: COLORS.surface.darker, true: COLORS.primary }}
+                                onValueChange={toggleNotifications}
+                                trackColor={{ false: theme.surfaceDarker, true: COLORS.primary }}
                                 thumbColor="#ffffff"
                             />
                         </View>
@@ -199,11 +206,11 @@ export default function SettingsScreen() {
                     {/* Appearance Section */}
                     <View
                         style={{
-                            backgroundColor: COLORS.surface.dark,
+                            backgroundColor: theme.surface,
                             borderRadius: BORDER_RADIUS.xl,
                             padding: SPACING.md,
                             borderWidth: 1,
-                            borderColor: 'rgba(148, 163, 184, 0.1)',
+                            borderColor: theme.cardBorder,
                             marginBottom: SPACING.lg,
                             ...SHADOWS.lg,
                         }}
@@ -212,11 +219,11 @@ export default function SettingsScreen() {
                             style={{
                                 fontSize: 14,
                                 fontWeight: '600',
-                                color: COLORS.text.primary,
+                                color: theme.text.primary,
                                 marginBottom: SPACING.md,
                             }}
                         >
-                            Giao diện
+                            {t.settings.appearance}
                         </Text>
 
                         {/* Dark Mode */}
@@ -227,7 +234,7 @@ export default function SettingsScreen() {
                                 justifyContent: 'space-between',
                                 paddingVertical: SPACING.sm,
                                 borderBottomWidth: 1,
-                                borderBottomColor: 'rgba(148, 163, 184, 0.1)',
+                                borderBottomColor: theme.divider,
                             }}
                         >
                             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -248,22 +255,22 @@ export default function SettingsScreen() {
                                     <Text
                                         style={{
                                             fontSize: 14,
-                                            color: COLORS.text.primary,
+                                            color: theme.text.primary,
                                             fontWeight: '500',
                                             marginBottom: SPACING.xs / 2,
                                         }}
                                     >
-                                        Chế độ tối
+                                        {t.settings.darkMode}
                                     </Text>
-                                    <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                                        Giao diện tối dễ nhìn vào ban đêm
+                                    <Text style={{ fontSize: 12, color: theme.text.secondary }}>
+                                        {t.settings.darkModeDesc}
                                     </Text>
                                 </View>
                             </View>
                             <Switch
-                                value={darkMode}
-                                onValueChange={setDarkMode}
-                                trackColor={{ false: COLORS.surface.darker, true: COLORS.primary }}
+                                value={isDarkMode}
+                                onValueChange={toggleDarkMode}
+                                trackColor={{ false: theme.surfaceDarker, true: COLORS.primary }}
                                 thumbColor="#ffffff"
                             />
                         </View>
@@ -296,30 +303,30 @@ export default function SettingsScreen() {
                                     <Text
                                         style={{
                                             fontSize: 14,
-                                            color: COLORS.text.primary,
+                                            color: theme.text.primary,
                                             fontWeight: '500',
                                             marginBottom: SPACING.xs / 2,
                                         }}
                                     >
-                                        Ngôn ngữ
+                                        {t.settings.language}
                                     </Text>
-                                    <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+                                    <Text style={{ fontSize: 12, color: theme.text.secondary }}>
                                         {selectedLanguage?.flag} {selectedLanguage?.name}
                                     </Text>
                                 </View>
                             </View>
-                            <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
+                            <Icon name="chevron_right" size={20} color={theme.text.secondary} />
                         </TouchableOpacity>
                     </View>
 
                     {/* Security Section */}
                     <View
                         style={{
-                            backgroundColor: COLORS.surface.dark,
+                            backgroundColor: theme.surface,
                             borderRadius: BORDER_RADIUS.xl,
                             padding: SPACING.md,
                             borderWidth: 1,
-                            borderColor: 'rgba(148, 163, 184, 0.1)',
+                            borderColor: theme.cardBorder,
                             marginBottom: SPACING.lg,
                             ...SHADOWS.lg,
                         }}
@@ -328,11 +335,11 @@ export default function SettingsScreen() {
                             style={{
                                 fontSize: 14,
                                 fontWeight: '600',
-                                color: COLORS.text.primary,
+                                color: theme.text.primary,
                                 marginBottom: SPACING.md,
                             }}
                         >
-                            Bảo mật
+                            {t.settings.security}
                         </Text>
 
                         {/* Biometric */}
@@ -362,22 +369,22 @@ export default function SettingsScreen() {
                                     <Text
                                         style={{
                                             fontSize: 14,
-                                            color: COLORS.text.primary,
+                                            color: theme.text.primary,
                                             fontWeight: '500',
                                             marginBottom: SPACING.xs / 2,
                                         }}
                                     >
-                                        Đăng nhập sinh trắc học
+                                        {t.settings.biometric}
                                     </Text>
-                                    <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                                        Sử dụng vân tay hoặc Face ID
+                                    <Text style={{ fontSize: 12, color: theme.text.secondary }}>
+                                        {t.settings.biometricDesc}
                                     </Text>
                                 </View>
                             </View>
                             <Switch
                                 value={biometricEnabled}
-                                onValueChange={setBiometricEnabled}
-                                trackColor={{ false: COLORS.surface.darker, true: COLORS.primary }}
+                                onValueChange={toggleBiometric}
+                                trackColor={{ false: theme.surfaceDarker, true: COLORS.primary }}
                                 thumbColor="#ffffff"
                             />
                         </View>
@@ -386,11 +393,11 @@ export default function SettingsScreen() {
                     {/* Storage & Data Section */}
                     <View
                         style={{
-                            backgroundColor: COLORS.surface.dark,
+                            backgroundColor: theme.surface,
                             borderRadius: BORDER_RADIUS.xl,
                             padding: SPACING.md,
                             borderWidth: 1,
-                            borderColor: 'rgba(148, 163, 184, 0.1)',
+                            borderColor: theme.cardBorder,
                             marginBottom: SPACING.lg,
                             ...SHADOWS.lg,
                         }}
@@ -399,11 +406,11 @@ export default function SettingsScreen() {
                             style={{
                                 fontSize: 14,
                                 fontWeight: '600',
-                                color: COLORS.text.primary,
+                                color: theme.text.primary,
                                 marginBottom: SPACING.md,
                             }}
                         >
-                            Dữ liệu & Lưu trữ
+                            {t.settings.storage}
                         </Text>
 
                         {/* Clear Cache */}
@@ -434,30 +441,30 @@ export default function SettingsScreen() {
                                     <Text
                                         style={{
                                             fontSize: 14,
-                                            color: COLORS.text.primary,
+                                            color: theme.text.primary,
                                             fontWeight: '500',
                                             marginBottom: SPACING.xs / 2,
                                         }}
                                     >
-                                        Xóa bộ nhớ đệm
+                                        {t.settings.clearCache}
                                     </Text>
-                                    <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+                                    <Text style={{ fontSize: 12, color: theme.text.secondary }}>
                                         Kích thước: ~12 MB
                                     </Text>
                                 </View>
                             </View>
-                            <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
+                            <Icon name="chevron_right" size={20} color={theme.text.secondary} />
                         </TouchableOpacity>
                     </View>
 
                     {/* About Section */}
                     <View
                         style={{
-                            backgroundColor: COLORS.surface.dark,
+                            backgroundColor: theme.surface,
                             borderRadius: BORDER_RADIUS.xl,
                             padding: SPACING.md,
                             borderWidth: 1,
-                            borderColor: 'rgba(148, 163, 184, 0.1)',
+                            borderColor: theme.cardBorder,
                             ...SHADOWS.lg,
                         }}
                     >
@@ -465,11 +472,11 @@ export default function SettingsScreen() {
                             style={{
                                 fontSize: 14,
                                 fontWeight: '600',
-                                color: COLORS.text.primary,
+                                color: theme.text.primary,
                                 marginBottom: SPACING.md,
                             }}
                         >
-                            Thông tin ứng dụng
+                            {t.settings.about}
                         </Text>
 
                         {/* Version */}
@@ -480,7 +487,7 @@ export default function SettingsScreen() {
                                 justifyContent: 'space-between',
                                 paddingVertical: SPACING.sm,
                                 borderBottomWidth: 1,
-                                borderBottomColor: 'rgba(148, 163, 184, 0.1)',
+                                borderBottomColor: theme.divider,
                             }}
                         >
                             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -501,14 +508,14 @@ export default function SettingsScreen() {
                                     <Text
                                         style={{
                                             fontSize: 14,
-                                            color: COLORS.text.primary,
+                                            color: theme.text.primary,
                                             fontWeight: '500',
                                             marginBottom: SPACING.xs / 2,
                                         }}
                                     >
-                                        Phiên bản
+                                        {t.settings.version}
                                     </Text>
-                                    <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+                                    <Text style={{ fontSize: 12, color: theme.text.secondary }}>
                                         1.0.0 (Build 2026.01.12)
                                     </Text>
                                 </View>
@@ -523,7 +530,7 @@ export default function SettingsScreen() {
                                 justifyContent: 'space-between',
                                 paddingVertical: SPACING.sm,
                                 borderBottomWidth: 1,
-                                borderBottomColor: 'rgba(148, 163, 184, 0.1)',
+                                borderBottomColor: theme.divider,
                             }}
                         >
                             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -543,14 +550,14 @@ export default function SettingsScreen() {
                                 <Text
                                     style={{
                                         fontSize: 14,
-                                        color: COLORS.text.primary,
+                                        color: theme.text.primary,
                                         fontWeight: '500',
                                     }}
                                 >
-                                    Điều khoản sử dụng
+                                    {t.settings.terms}
                                 </Text>
                             </View>
-                            <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
+                            <Icon name="chevron_right" size={20} color={theme.text.secondary} />
                         </TouchableOpacity>
 
                         {/* Privacy */}
@@ -579,14 +586,14 @@ export default function SettingsScreen() {
                                 <Text
                                     style={{
                                         fontSize: 14,
-                                        color: COLORS.text.primary,
+                                        color: theme.text.primary,
                                         fontWeight: '500',
                                     }}
                                 >
-                                    Chính sách bảo mật
+                                    {t.settings.privacy}
                                 </Text>
                             </View>
-                            <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
+                            <Icon name="chevron_right" size={20} color={theme.text.secondary} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -610,7 +617,7 @@ export default function SettingsScreen() {
                 >
                     <View
                         style={{
-                            backgroundColor: COLORS.surface.dark,
+                            backgroundColor: theme.surface,
                             borderTopLeftRadius: BORDER_RADIUS.xl,
                             borderTopRightRadius: BORDER_RADIUS.xl,
                             padding: SPACING.lg,
@@ -629,13 +636,13 @@ export default function SettingsScreen() {
                                 style={{
                                     fontSize: 18,
                                     fontWeight: '600',
-                                    color: COLORS.text.primary,
+                                    color: theme.text.primary,
                                 }}
                             >
-                                Chọn ngôn ngữ
+                                {t.settings.selectLanguage}
                             </Text>
                             <TouchableOpacity onPress={() => setShowLanguagePicker(false)}>
-                                <Icon name="close" size={24} color={COLORS.text.primary} />
+                                <Icon name="close" size={24} color={theme.text.primary} />
                             </TouchableOpacity>
                         </View>
 
@@ -652,7 +659,7 @@ export default function SettingsScreen() {
                                     justifyContent: 'space-between',
                                     paddingVertical: SPACING.md,
                                     borderBottomWidth: 1,
-                                    borderBottomColor: 'rgba(148, 163, 184, 0.1)',
+                                    borderBottomColor: theme.divider,
                                 }}
                             >
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>

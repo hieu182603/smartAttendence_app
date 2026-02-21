@@ -15,13 +15,15 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { EmployeeTabParamList } from '../../navigation/AppNavigator';
 import { useAuth } from '../../context/AuthContext';
-import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
+import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../../utils/styles';
+import { useTranslation } from '../../i18n';
 import { Icon } from '../../components/Icon';
 import { AttendanceService } from '../../services/attendance.service';
 import { LeaveService } from '../../services/leave.service';
 import { NotificationService } from '../../services/notification.service';
 import { AttendanceStats, Activity, Notification } from '../../types';
 import { useSocket } from '../../context/SocketContext';
+import { usePreferences } from '../../context/PreferencesContext';
 
 type DashboardScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Home'>;
 
@@ -34,6 +36,9 @@ const { width } = Dimensions.get('window');
 export default function DashboardScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const { notificationsEnabled } = usePreferences();
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -137,9 +142,9 @@ export default function DashboardScreen() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Chào buổi sáng';
-    if (hour < 18) return 'Chào buổi chiều';
-    return 'Chào buổi tối';
+    if (hour < 12) return t.dashboard.greetingMorning;
+    if (hour < 18) return t.dashboard.greetingAfternoon;
+    return t.dashboard.greetingEvening;
   };
 
   const getNotificationBg = (type: string) => {
@@ -151,7 +156,7 @@ export default function DashboardScreen() {
     }
   };
 
-  const userName = user?.name || 'Nguyễn Văn A';
+  const userName = user?.name;
   const userAvatar = user?.avatar;
 
   const unreadCount = notifications.filter(n => n.unread).length;
@@ -163,11 +168,14 @@ export default function DashboardScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const { socket } = useSocket();
 
+
   // 🔴 Realtime: Listen for socket events
   useEffect(() => {
     if (!socket) return;
 
     const handleNewNotification = (data: any) => {
+      // Suppress in-app notification if user disabled notifications
+      if (!notificationsEnabled) return;
       console.log('[Dashboard] New notification via socket:', data.title);
       // Add to notifications list
       const mapped = {
@@ -212,7 +220,7 @@ export default function DashboardScreen() {
   };
 
   return (
-    <View style={globalStyles.container}>
+    <View style={[globalStyles.container, { backgroundColor: theme.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -315,7 +323,7 @@ export default function DashboardScreen() {
                 </View>
                 <View>
                   <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 12 }}>
-                    Xin chào,
+                    {t.dashboard.greeting},
                   </Text>
                   <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600' }}>
                     {userName}
@@ -378,7 +386,7 @@ export default function DashboardScreen() {
                 {greeting}
               </Text>
               <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>
-                Hãy bắt đầu một ngày làm việc hiệu quả
+                {t.dashboard.subtitle}
               </Text>
             </View>
           </View>
@@ -386,6 +394,7 @@ export default function DashboardScreen() {
 
         {/* Main Content */}
         <View style={{ paddingHorizontal: SPACING.lg, marginTop: SPACING.md }}>
+
           {/* Attendance Action Widget - Redesigned */}
           <LinearGradient
             colors={isCheckedIn ? [COLORS.accent.red, '#b91c1c'] : [COLORS.accent.green, '#047857']}
@@ -407,10 +416,10 @@ export default function DashboardScreen() {
                   marginBottom: SPACING.xs,
                 }}
               >
-                {isCheckedIn ? 'Đang làm việc' : 'Sẵn sàng làm việc'}
+                {isCheckedIn ? t.dashboard.working : t.dashboard.ready}
               </Text>
               <Text style={{ fontSize: 14, color: 'rgba(255, 255, 255, 0.9)' }}>
-                {isCheckedIn ? 'Hãy chấm công ra khi kết thúc ca làm việc.' : 'Chúc bạn một ngày làm việc hiệu quả!'}
+                {isCheckedIn ? t.dashboard.workingSubtitle : t.dashboard.readySubtitle}
               </Text>
             </View>
 
@@ -445,7 +454,7 @@ export default function DashboardScreen() {
                       marginLeft: SPACING.sm,
                     }}
                   >
-                    {isCheckedIn ? 'Chấm công ra' : 'Chấm công vào'}
+                    {isCheckedIn ? t.dashboard.checkout : t.dashboard.checkin}
                   </Text>
                 </>
               )}
@@ -460,7 +469,7 @@ export default function DashboardScreen() {
                   key={i}
                   style={{
                     width: (width - SPACING.lg * 3) / 2,
-                    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                    backgroundColor: theme.cardBg,
                     borderRadius: BORDER_RADIUS.lg,
                     padding: SPACING.md,
                     marginRight: i % 2 === 0 ? 0 : SPACING.md,
@@ -478,13 +487,13 @@ export default function DashboardScreen() {
                 <View
                   style={{
                     width: (width - SPACING.lg * 3) / 2,
-                    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                    backgroundColor: theme.cardBg,
                     borderRadius: BORDER_RADIUS.lg,
                     padding: SPACING.md,
                     marginRight: SPACING.md,
                     marginBottom: SPACING.md,
                     borderWidth: 1,
-                    borderColor: 'rgba(148, 163, 184, 0.1)',
+                    borderColor: theme.cardBorder,
                     ...SHADOWS.md,
                   }}
                 >
@@ -501,21 +510,21 @@ export default function DashboardScreen() {
                   >
                     <Icon name="event" size={20} color={COLORS.accent.green} />
                   </View>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs }}>
-                    Phép còn lại
+                  <Text style={{ fontSize: 11, color: theme.text.secondary, marginBottom: SPACING.xs }}>
+                    {t.dashboard.stats.leaves}
                   </Text>
                   <Text
                     style={{
                       fontSize: 24,
                       fontWeight: '600',
-                      color: COLORS.text.primary,
+                      color: theme.text.primary,
                       marginBottom: SPACING.xs / 2,
                     }}
                   >
                     {stats.leavesRemaining}
                   </Text>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                    ngày nghỉ
+                  <Text style={{ fontSize: 11, color: theme.text.secondary }}>
+                    {t.dashboard.stats.leaveDays}
                   </Text>
                 </View>
 
@@ -523,12 +532,12 @@ export default function DashboardScreen() {
                 <View
                   style={{
                     width: (width - SPACING.lg * 3) / 2,
-                    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                    backgroundColor: theme.cardBg,
                     borderRadius: BORDER_RADIUS.lg,
                     padding: SPACING.md,
                     marginBottom: SPACING.md,
                     borderWidth: 1,
-                    borderColor: 'rgba(148, 163, 184, 0.1)',
+                    borderColor: theme.cardBorder,
                     ...SHADOWS.md,
                   }}
                 >
@@ -545,20 +554,20 @@ export default function DashboardScreen() {
                   >
                     <Icon name="schedule" size={20} color={COLORS.primary} />
                   </View>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs }}>
-                    Ca làm tiếp theo
+                  <Text style={{ fontSize: 11, color: theme.text.secondary, marginBottom: SPACING.xs }}>
+                    {t.dashboard.stats.nextShift}
                   </Text>
                   <Text
                     style={{
                       fontSize: 18,
                       fontWeight: '600',
-                      color: COLORS.text.primary,
+                      color: theme.text.primary,
                       marginBottom: SPACING.xs / 2,
                     }}
                   >
                     Thứ Hai
                   </Text>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
+                  <Text style={{ fontSize: 11, color: theme.text.secondary }}>
                     08:00 - 17:00
                   </Text>
                 </View>
@@ -571,13 +580,13 @@ export default function DashboardScreen() {
                   onPress={() => navigation.navigate('AttendanceHistory' as any)}
                   style={{
                     width: (width - SPACING.lg * 3) / 2,
-                    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                    backgroundColor: theme.cardBg,
                     borderRadius: BORDER_RADIUS.lg,
                     padding: SPACING.md,
                     marginRight: SPACING.md,
                     marginBottom: SPACING.md,
                     borderWidth: 1,
-                    borderColor: 'rgba(148, 163, 184, 0.1)',
+                    borderColor: theme.cardBorder,
                     ...SHADOWS.md,
                   }}
                 >
@@ -594,21 +603,21 @@ export default function DashboardScreen() {
                   >
                     <Icon name="check_circle" size={20} color={COLORS.accent.cyan} />
                   </View>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs }}>
-                    Chấm công tháng này
+                  <Text style={{ fontSize: 11, color: theme.text.secondary, marginBottom: SPACING.xs }}>
+                    {t.dashboard.stats.attendance}
                   </Text>
                   <Text
                     style={{
                       fontSize: 20,
                       fontWeight: '600',
-                      color: COLORS.text.primary,
+                      color: theme.text.primary,
                       marginBottom: SPACING.xs / 2,
                     }}
                   >
                     {stats.thisMonth}/{stats.totalDays}
                   </Text>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                    giờ chi tiết &gt;
+                  <Text style={{ fontSize: 11, color: theme.text.secondary }}>
+                    {t.dashboard.stats.details}
                   </Text>
                 </TouchableOpacity>
 
@@ -616,12 +625,12 @@ export default function DashboardScreen() {
                 <View
                   style={{
                     width: (width - SPACING.lg * 3) / 2,
-                    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                    backgroundColor: theme.cardBg,
                     borderRadius: BORDER_RADIUS.lg,
                     padding: SPACING.md,
                     marginBottom: SPACING.md,
                     borderWidth: 1,
-                    borderColor: 'rgba(148, 163, 184, 0.1)',
+                    borderColor: theme.cardBorder,
                     ...SHADOWS.md,
                   }}
                 >
@@ -638,21 +647,21 @@ export default function DashboardScreen() {
                   >
                     <Icon name="bolt" size={20} color={COLORS.accent.yellow} />
                   </View>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs }}>
-                    Tăng ca tháng này
+                  <Text style={{ fontSize: 11, color: theme.text.secondary, marginBottom: SPACING.xs }}>
+                    {t.dashboard.stats.overtime}
                   </Text>
                   <Text
                     style={{
                       fontSize: 20,
                       fontWeight: '600',
-                      color: COLORS.text.primary,
+                      color: theme.text.primary,
                       marginBottom: SPACING.xs / 2,
                     }}
                   >
                     {stats.overtimeHours}
                   </Text>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                    giờ làm thêm
+                  <Text style={{ fontSize: 11, color: theme.text.secondary }}>
+                    {t.dashboard.stats.overtimeHours}
                   </Text>
                 </View>
               </View>
@@ -673,27 +682,27 @@ export default function DashboardScreen() {
                 style={{
                   fontSize: 16,
                   fontWeight: '600',
-                  color: COLORS.text.primary,
+                  color: theme.text.primary,
                   marginLeft: SPACING.sm,
                 }}
               >
-                Hoạt động gần đây
+                {t.dashboard.recentActivity}
               </Text>
             </View>
             <View
               style={{
-                backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                backgroundColor: theme.cardBg,
                 borderRadius: BORDER_RADIUS.lg,
                 padding: SPACING.md,
                 borderWidth: 1,
-                borderColor: 'rgba(148, 163, 184, 0.1)',
+                borderColor: theme.cardBorder,
                 ...SHADOWS.md,
               }}
             >
               {activities.length === 0 ? (
                 <View style={{ paddingVertical: SPACING.lg, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 14, color: COLORS.text.secondary }}>
-                    Chưa có hoạt động nào
+                  <Text style={{ fontSize: 14, color: theme.text.secondary }}>
+                    {t.dashboard.noActivity}
                   </Text>
                 </View>
               ) : (
@@ -715,7 +724,7 @@ export default function DashboardScreen() {
                           alignItems: 'center',
                           paddingVertical: SPACING.sm,
                           borderBottomWidth: index < activities.length - 1 ? 1 : 0,
-                          borderBottomColor: 'rgba(148, 163, 184, 0.1)',
+                          borderBottomColor: theme.divider,
                         }}
                       >
                         <View
@@ -732,17 +741,17 @@ export default function DashboardScreen() {
                             style={{
                               fontSize: 14,
                               fontWeight: '500',
-                              color: COLORS.text.primary,
+                              color: theme.text.primary,
                               marginBottom: SPACING.xs / 2,
                             }}
                           >
                             {activity.title}
                           </Text>
-                          <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+                          <Text style={{ fontSize: 12, color: theme.text.secondary }}>
                             {activity.time} • {activity.date}
                           </Text>
                         </View>
-                        <Icon name="chevron_right" size={16} color={COLORS.text.secondary} />
+                        <Icon name="chevron_right" size={16} color={theme.text.secondary} />
                       </TouchableOpacity>
                     );
                   })}

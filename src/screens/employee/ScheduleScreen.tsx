@@ -11,8 +11,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import { EmployeeTabParamList } from '../../navigation/AppNavigator';
-import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
+import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../../utils/styles';
+import { useTranslation } from '../../i18n';
 import { Icon } from '../../components/Icon';
+import { ShiftService, EmployeeSchedule } from '../../services/shift.service';
 import { AttendanceService } from '../../services/attendance.service';
 
 type ScheduleScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Schedule'>;
@@ -25,34 +27,20 @@ const { width } = Dimensions.get('window');
 const SPACING_LG = SPACING.lg;
 const GAP_SIZE = SPACING.sm;
 const TOTAL_HORIZONTAL_PADDING = SPACING_LG * 2;
-// 7 items per row, 6 gaps. Use Math.floor to ensure it fits without rounding errors causing wrap.
 const CALENDAR_ITEM_SIZE = Math.floor((width - TOTAL_HORIZONTAL_PADDING - (GAP_SIZE * 6)) / 7) - 1;
 
-const monthNames = [
-  'Tháng 1',
-  'Tháng 2',
-  'Tháng 3',
-  'Tháng 4',
-  'Tháng 5',
-  'Tháng 6',
-  'Tháng 7',
-  'Tháng 8',
-  'Tháng 9',
-  'Tháng 10',
-  'Tháng 11',
-  'Tháng 12',
-];
-
-const DAYS_OF_WEEK = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+// Day status type matching the web version
+type DayStatus = 'completed' | 'today' | 'scheduled' | 'off' | 'none';
 
 export default function ScheduleScreen() {
+  const theme = useTheme();
+  const { t } = useTranslation();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [shifts, setShifts] = useState<Record<string, any>>({});
-  const [leaveDays, setLeaveDays] = useState<Record<string, any>>({});
+  const [scheduleMap, setScheduleMap] = useState<Record<string, EmployeeSchedule>>({});
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
-  // Helper to format date as YYYY-MM-DD
   const formatDate = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -64,50 +52,78 @@ export default function ScheduleScreen() {
     try {
       setLoading(true);
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const monthStr = `${year}-${month}`;
+      const month = date.getMonth();
 
-      console.log(`Fetching schedule for: ${monthStr}`);
-      const response = await AttendanceService.getSchedule(monthStr);
-      console.log('Schedule data:', JSON.stringify(response, null, 2));
+      // Build date range for the full month
+      const startDate = formatDate(new Date(year, month, 1));
+      const endDate = formatDate(new Date(year, month + 1, 0));
 
-      // Handle response structure
-      // If response.data exists, use it. Otherwise use response directly.
-      const data = response.data || response;
+      console.log(`[Schedule] Fetching: ${startDate} → ${endDate}`);
 
-      if (data) {
-        // Normalize keys to YYYY-MM-DD just in case
-        const normalizedShifts: Record<string, any> = {};
-        if (data.shifts) {
-          Object.keys(data.shifts).forEach(key => {
-            const dateParams = new Date(key);
-            if (!isNaN(dateParams.getTime())) {
-              const normalizedKey = formatDate(dateParams);
-              normalizedShifts[normalizedKey] = data.shifts[key];
-            } else {
-              normalizedShifts[key] = data.shifts[key];
-            }
-          });
+      // Fetch schedule and attendance in parallel
+      const [scheduleData, attendanceData] = await Promise.all([
+        ShiftService.getMySchedule(startDate, endDate),
+        AttendanceService.getHistory({ from: startDate, to: endDate, limit: 100 }).catch(() => ({ records: [] })),
+      ]);
+
+      console.log('[Schedule] Received:', scheduleData.length, 'schedules');
+
+      // Build schedule map keyed by date
+      const newScheduleMap: Record<string, EmployeeSchedule> = {};
+      scheduleData.forEach((sched: EmployeeSchedule) => {
+        if (sched.date) {
+          // Normalize to YYYY-MM-DD
+          const dateStr = sched.date.includes('T') ? sched.date.split('T')[0] : sched.date;
+          newScheduleMap[dateStr] = sched;
         }
+      });
 
-        const normalizedLeaves: Record<string, any> = {};
-        if (data.leaves) {
-          Object.keys(data.leaves).forEach(key => {
-            const dateParams = new Date(key);
-            if (!isNaN(dateParams.getTime())) {
-              const normalizedKey = formatDate(dateParams);
-              normalizedLeaves[normalizedKey] = data.leaves[key];
+      // Build attendance map keyed by date
+      const newAttendanceMap: Record<string, any> = {};
+      const records = attendanceData?.records || attendanceData?.data || [];
+      if (Array.isArray(records)) {
+        records.forEach((record: any) => {
+          if (record.date) {
+            const dateValue = String(record.date).trim();
+            let dateStr = '';
+
+            // ISO format
+            if (/^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+              const d = new Date(dateValue);
+              if (!isNaN(d.getTime())) {
+                dateStr = d.toISOString().split('T')[0];
+              }
             } else {
-              normalizedLeaves[key] = data.leaves[key];
+              // Try Vietnamese date format
+              const dateRegex = /(\d{1,2})\s*(?:tháng|[/-])\s*(\d{1,2})(?:,\s*|\s+|[/-])\s*(\d{4})/;
+              const match = dateRegex.exec(dateValue);
+              if (match) {
+                const day = parseInt(match[1], 10);
+                const mo = parseInt(match[2], 10);
+                const yr = parseInt(match[3], 10);
+                const d = new Date(yr, mo - 1, day);
+                if (!isNaN(d.getTime())) {
+                  dateStr = d.toISOString().split('T')[0];
+                }
+              } else {
+                const d = new Date(dateValue);
+                if (!isNaN(d.getTime())) {
+                  dateStr = d.toISOString().split('T')[0];
+                }
+              }
             }
-          });
-        }
 
-        setShifts(normalizedShifts);
-        setLeaveDays(normalizedLeaves);
+            if (dateStr) {
+              newAttendanceMap[dateStr] = record;
+            }
+          }
+        });
       }
+
+      setScheduleMap(newScheduleMap);
+      setAttendanceMap(newAttendanceMap);
     } catch (error) {
-      console.log('Error fetching schedule:', error);
+      console.log('[Schedule] Error:', error);
     } finally {
       setLoading(false);
     }
@@ -125,12 +141,10 @@ export default function ScheduleScreen() {
     const days = new Date(year, month + 1, 0).getDate();
     const firstDay = new Date(year, month, 1).getDay();
 
-    const result = [];
-    // Add empty slots for previous month
+    const result: (Date | null)[] = [];
     for (let i = 0; i < firstDay; i++) {
       result.push(null);
     }
-    // Add days of current month
     for (let i = 1; i <= days; i++) {
       result.push(new Date(year, month, i));
     }
@@ -151,11 +165,123 @@ export default function ScheduleScreen() {
       date.getFullYear() === today.getFullYear();
   };
 
+  /**
+   * Get the status of a calendar day — matching the web's getWeekDayStatus() logic.
+   */
+  const getDayStatus = (date: Date): DayStatus => {
+    const dateStr = formatDate(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = formatDate(today);
+    const dayOfWeek = date.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    const schedule = scheduleMap[dateStr];
+    const attendance = attendanceMap[dateStr];
+
+    // If no schedule for this day
+    if (!schedule) {
+      // Check if has attendance record anyway
+      if (attendance) {
+        const checkIn = attendance.checkIn || attendance.check_in;
+        const hasCheckIn = checkIn &&
+          String(checkIn).trim() !== '' &&
+          String(checkIn).trim() !== '—' &&
+          String(checkIn).trim() !== 'null';
+        if (hasCheckIn) return 'completed';
+      }
+      return 'off';
+    }
+
+    // If schedule status is "off" (from approved leave requests)
+    if (schedule.status === 'off') return 'off';
+
+    // Check attendance for this day
+    if (attendance) {
+      const checkIn = attendance.checkIn || attendance.check_in;
+      const hasCheckIn = checkIn &&
+        String(checkIn).trim() !== '' &&
+        String(checkIn).trim() !== '—' &&
+        String(checkIn).trim() !== 'null' &&
+        String(checkIn).trim() !== 'undefined';
+
+      if (hasCheckIn) return 'completed';
+
+      if (attendance.status === 'absent' || attendance.status === 'weekend') return 'off';
+    }
+
+    // Today
+    if (dateStr === todayStr) return 'today';
+
+    // Past day without attendance = missed (show as off)
+    const dateOnly = new Date(date);
+    dateOnly.setHours(0, 0, 0, 0);
+    if (dateOnly < today) return 'off';
+
+    // Future scheduled
+    return 'scheduled';
+  };
+
+  /**
+   * Get colors for a day status — matching the web's getWeekDayColor() logic.
+   */
+  const getDayColors = (status: DayStatus, isSelected: boolean, isTodayDate: boolean) => {
+    if (isSelected) {
+      return {
+        backgroundColor: COLORS.primary,
+        textColor: '#ffffff',
+        borderColor: COLORS.primaryLight,
+      };
+    }
+
+    switch (status) {
+      case 'completed':
+        return {
+          backgroundColor: COLORS.accent.green,
+          textColor: '#ffffff',
+          borderColor: COLORS.accent.green,
+        };
+      case 'today':
+        return {
+          backgroundColor: COLORS.accent.cyan,
+          textColor: '#ffffff',
+          borderColor: COLORS.accent.cyan,
+        };
+      case 'scheduled':
+        return {
+          backgroundColor: COLORS.primary,
+          textColor: '#ffffff',
+          borderColor: COLORS.primary,
+        };
+      case 'off':
+        return {
+          backgroundColor: 'rgba(148, 163, 184, 0.25)',
+          textColor: COLORS.text.secondary,
+          borderColor: 'rgba(148, 163, 184, 0.3)',
+        };
+      default:
+        return {
+          backgroundColor: 'transparent',
+          textColor: theme.text.primary,
+          borderColor: 'transparent',
+        };
+    }
+  };
+
   const days = getDaysInMonth(currentDate);
-  const selectedShift = selectedDate ? shifts[selectedDate] : null;
+  const selectedSchedule = selectedDate ? scheduleMap[selectedDate] : null;
+  const selectedAttendance = selectedDate ? attendanceMap[selectedDate] : null;
+
+  // Legend items matching the web version
+  const legendItems = [
+    { color: COLORS.accent.green, label: t.schedule.legend.completed },
+    { color: COLORS.accent.cyan, label: t.schedule.legend.today },
+    { color: COLORS.primary, label: t.schedule.legend.scheduled },
+    { color: 'rgba(148, 163, 184, 0.4)', label: t.schedule.legend.off },
+  ];
 
   return (
-    <View style={globalStyles.container}>
+    <View style={[globalStyles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.accent.cyan]}
@@ -168,10 +294,10 @@ export default function ScheduleScreen() {
         }}
       >
         <Text style={{ fontSize: 24, fontWeight: '600', color: '#ffffff' }}>
-          Lịch làm việc
+          {t.schedule.title}
         </Text>
         <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>
-          Quản lý ca làm việc và ngày nghỉ
+          {t.schedule.subtitle}
         </Text>
       </LinearGradient>
 
@@ -189,26 +315,26 @@ export default function ScheduleScreen() {
             onPress={() => changeMonth(-1)}
             style={{
               padding: SPACING.sm,
-              backgroundColor: COLORS.surface.dark,
+              backgroundColor: theme.surface,
               borderRadius: BORDER_RADIUS.md,
               ...SHADOWS.sm,
             }}
           >
-            <Icon name="chevron_left" size={24} color={COLORS.text.primary} />
+            <Icon name="chevron_left" size={24} color={theme.text.primary} />
           </TouchableOpacity>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.text.primary }}>
-            {monthNames[currentDate.getMonth()]}, {currentDate.getFullYear()}
+          <Text style={{ fontSize: 18, fontWeight: '600', color: theme.text.primary }}>
+            {t.schedule.months[currentDate.getMonth()]}, {currentDate.getFullYear()}
           </Text>
           <TouchableOpacity
             onPress={() => changeMonth(1)}
             style={{
               padding: SPACING.sm,
-              backgroundColor: COLORS.surface.dark,
+              backgroundColor: theme.surface,
               borderRadius: BORDER_RADIUS.md,
               ...SHADOWS.sm,
             }}
           >
-            <Icon name="chevron_right" size={24} color={COLORS.text.primary} />
+            <Icon name="chevron_right" size={24} color={theme.text.primary} />
           </TouchableOpacity>
         </View>
 
@@ -218,7 +344,7 @@ export default function ScheduleScreen() {
           <>
             {/* Days Header */}
             <View style={{ flexDirection: 'row', paddingHorizontal: SPACING.lg, marginBottom: SPACING.md }}>
-              {DAYS_OF_WEEK.map((day, index) => (
+              {t.schedule.daysOfWeek.map((day, index) => (
                 <View
                   key={index}
                   style={{
@@ -231,7 +357,7 @@ export default function ScheduleScreen() {
                     style={{
                       fontSize: 12,
                       fontWeight: '600',
-                      color: index === 0 || index === 6 ? COLORS.accent.red : COLORS.text.secondary,
+                      color: index === 0 || index === 6 ? COLORS.accent.red : theme.text.secondary,
                     }}
                   >
                     {day}
@@ -258,44 +384,11 @@ export default function ScheduleScreen() {
                 }
 
                 const dateStr = formatDate(date);
-                const hasShift = shifts[dateStr];
-                const isLeave = leaveDays[dateStr];
                 const isSelected = selectedDate === dateStr;
-                const isCurrentDay = isToday(date);
+                const isTodayDate = isToday(date);
+                const dayStatus = getDayStatus(date);
+                const colors = getDayColors(dayStatus, isSelected, isTodayDate);
                 const day = date.getDate();
-                const dayOfWeek = date.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-                // Determine day type and colors
-                let backgroundColor = 'transparent';
-                let textColor = COLORS.text.secondary;
-                let borderColor = 'transparent';
-                let dotColor = COLORS.primary;
-
-                if (isSelected) {
-                  backgroundColor = COLORS.primary;
-                  textColor = '#ffffff';
-                  borderColor = COLORS.primary;
-                  dotColor = '#ffffff';
-                } else if (isLeave) {
-                  backgroundColor = COLORS.accent.red;
-                  textColor = '#ffffff';
-                  borderColor = COLORS.accent.red;
-                  dotColor = '#ffffff';
-                } else if (hasShift) {
-                  backgroundColor = COLORS.accent.green;
-                  textColor = '#ffffff';
-                  borderColor = COLORS.accent.green;
-                  dotColor = '#ffffff';
-                } else if (isWeekend && !hasShift) {
-                  // Only gray out if no shift assigned
-                  backgroundColor = 'rgba(148, 163, 184, 0.2)';
-                  textColor = COLORS.text.secondary;
-                  borderColor = 'rgba(148, 163, 184, 0.3)';
-                  dotColor = COLORS.text.secondary;
-                } else {
-                  textColor = COLORS.text.primary;
-                }
 
                 return (
                   <TouchableOpacity
@@ -305,9 +398,9 @@ export default function ScheduleScreen() {
                       width: CALENDAR_ITEM_SIZE,
                       height: CALENDAR_ITEM_SIZE,
                       borderRadius: BORDER_RADIUS.lg,
-                      backgroundColor,
-                      borderWidth: 1,
-                      borderColor,
+                      backgroundColor: colors.backgroundColor,
+                      borderWidth: isTodayDate && !isSelected ? 2 : 1,
+                      borderColor: isTodayDate && !isSelected ? COLORS.accent.cyan : colors.borderColor,
                       justifyContent: 'center',
                       alignItems: 'center',
                       marginRight: isLastInRow ? 0 : GAP_SIZE,
@@ -318,300 +411,179 @@ export default function ScheduleScreen() {
                     <Text
                       style={{
                         fontSize: 14,
-                        fontWeight: '600',
-                        color: textColor,
+                        fontWeight: isTodayDate || isSelected ? '700' : '600',
+                        color: colors.textColor,
                       }}
                     >
                       {day}
                     </Text>
-
-                    {/* Dot indicator */}
-                    {(hasShift || isLeave) && (
-                      <View
-                        style={{
-                          width: 4,
-                          height: 4,
-                          borderRadius: 2,
-                          backgroundColor: dotColor,
-                          marginTop: 4,
-                        }}
-                      />
-                    )}
-
-                    {/* Today indicator */}
-                    {isCurrentDay && !isSelected && (
-                      <View
-                        style={{
-                          position: 'absolute',
-                          bottom: 2,
-                          width: 4,
-                          height: 4,
-                          borderRadius: 2,
-                          backgroundColor: COLORS.accent.cyan,
-                        }}
-                      />
-                    )}
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-
             {/* Legend */}
             <View style={{ paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md }}>
               <View
                 style={{
-                  backgroundColor: COLORS.surface.dark,
+                  backgroundColor: theme.surface,
                   borderRadius: BORDER_RADIUS.lg,
                   padding: SPACING.md,
                   borderWidth: 1,
-                  borderColor: 'rgba(148, 163, 184, 0.1)',
+                  borderColor: theme.cardBorder,
                 }}
               >
                 <Text
                   style={{
                     fontSize: 11,
                     fontWeight: '600',
-                    color: COLORS.text.secondary,
+                    color: theme.text.secondary,
                     marginBottom: SPACING.md,
                   }}
                 >
-                  Chú thích
+                  {t.schedule.legend.title}
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      width: '50%',
-                      marginBottom: SPACING.sm,
-                    }}
-                  >
+                  {legendItems.map((item, index) => (
                     <View
+                      key={index}
                       style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 8,
-                        backgroundColor: COLORS.accent.green,
-                        marginRight: SPACING.sm,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        width: '50%',
+                        marginBottom: SPACING.sm,
                       }}
-                    />
-                    <Text style={{ fontSize: 12, color: COLORS.text.primary }}>
-                      Ca làm việc
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      width: '50%',
-                      marginBottom: SPACING.sm,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 8,
-                        backgroundColor: COLORS.accent.red,
-                        marginRight: SPACING.sm,
-                      }}
-                    />
-                    <Text style={{ fontSize: 12, color: COLORS.text.primary }}>
-                      Nghỉ phép
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      width: '50%',
-                      marginBottom: SPACING.sm,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 8,
-                        backgroundColor: 'rgba(148, 163, 184, 0.2)',
-                        marginRight: SPACING.sm,
-                      }}
-                    />
-                    <Text style={{ fontSize: 12, color: COLORS.text.primary }}>
-                      Cuối tuần
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      width: '50%',
-                      marginBottom: SPACING.sm,
-                    }}
-                  >
-                    <LinearGradient
-                      colors={[COLORS.primary, COLORS.accent.cyan]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 8,
-                        marginRight: SPACING.sm,
-                      }}
-                    />
-                    <Text style={{ fontSize: 12, color: COLORS.text.primary }}>
-                      Đã chọn
-                    </Text>
-                  </View>
+                    >
+                      <View
+                        style={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: 6,
+                          backgroundColor: item.color,
+                          marginRight: SPACING.sm,
+                        }}
+                      />
+                      <Text style={{ fontSize: 12, color: theme.text.primary }}>
+                        {item.label}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
               </View>
             </View>
 
             {/* Shift Details */}
-            {
-              selectedShift && selectedDate && (
-                <View style={{ paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg }}>
+            {selectedSchedule && selectedDate && (
+              <View style={{ paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: SPACING.md,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: COLORS.primary,
+                      marginRight: SPACING.sm,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '600',
+                      color: theme.text.primary,
+                    }}
+                  >
+                    {t.schedule.detail.title}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    backgroundColor: theme.surface,
+                    borderRadius: BORDER_RADIUS.xl,
+                    padding: SPACING.lg,
+                    borderWidth: 1,
+                    borderColor: theme.cardBorder,
+                    ...SHADOWS.lg,
+                  }}
+                >
                   <View
                     style={{
                       flexDirection: 'row',
-                      alignItems: 'center',
-                      marginBottom: SPACING.md,
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: SPACING.lg,
                     }}
                   >
-                    <View
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: COLORS.primary,
-                        marginRight: SPACING.sm,
-                      }}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: '600',
-                        color: COLORS.text.primary,
-                      }}
-                    >
-                      Chi tiết ca làm
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      backgroundColor: 'rgba(30, 41, 59, 0.6)',
-                      borderRadius: BORDER_RADIUS.xl,
-                      padding: SPACING.lg,
-                      borderWidth: 1,
-                      borderColor: 'rgba(148, 163, 184, 0.1)',
-                      ...SHADOWS.lg,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        marginBottom: SPACING.lg,
-                      }}
-                    >
-                      <View>
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            color: COLORS.text.secondary,
-                            marginBottom: SPACING.xs / 2,
-                          }}
-                        >
-                          Ngày làm việc
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 16,
-                            fontWeight: '600',
-                            color: COLORS.text.primary,
-                          }}
-                        >
-                          {new Date(selectedDate as string).toLocaleDateString('vi-VN', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                        </Text>
-                      </View>
-                      <View
-                        style={{
-                          backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                          borderWidth: 1,
-                          borderColor: 'rgba(34, 197, 94, 0.3)',
-                          borderRadius: BORDER_RADIUS.md,
-                          paddingHorizontal: SPACING.sm,
-                          paddingVertical: SPACING.xs / 2,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            fontWeight: '600',
-                            color: COLORS.accent.green,
-                          }}
-                        >
-                          Đã xếp lịch
-                        </Text>
-                      </View>
-                    </View>
-
                     <View>
-                      {/* Working Hours */}
-                      <View
+                      <Text
                         style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          padding: SPACING.md,
-                          borderRadius: BORDER_RADIUS.lg,
-                          backgroundColor: 'rgba(66, 69, 240, 0.1)',
-                          marginBottom: SPACING.sm,
+                          fontSize: 11,
+                          color: theme.text.secondary,
+                          marginBottom: SPACING.xs / 2,
                         }}
                       >
-                        <View
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 12,
-                            backgroundColor: 'rgba(66, 69, 240, 0.2)',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            marginRight: SPACING.md,
-                          }}
-                        >
-                          <Icon name="schedule" size={20} color={COLORS.primary} />
-                        </View>
-                        <View>
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              color: COLORS.text.secondary,
-                              marginBottom: SPACING.xs / 2,
-                            }}
-                          >
-                            Giờ làm việc
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              fontWeight: '500',
-                              color: COLORS.text.primary,
-                            }}
-                          >
-                            {selectedShift.start} - {selectedShift.end}
-                          </Text>
-                        </View>
-                      </View>
+                        {t.schedule.detail.workDate}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '600',
+                          color: theme.text.primary,
+                        }}
+                      >
+                        {new Date(selectedDate).toLocaleDateString('vi-VN', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        backgroundColor: selectedSchedule.status === 'completed'
+                          ? 'rgba(34, 197, 94, 0.15)'
+                          : selectedSchedule.status === 'off'
+                            ? 'rgba(148, 163, 184, 0.15)'
+                            : 'rgba(66, 69, 240, 0.15)',
+                        borderWidth: 1,
+                        borderColor: selectedSchedule.status === 'completed'
+                          ? 'rgba(34, 197, 94, 0.3)'
+                          : selectedSchedule.status === 'off'
+                            ? 'rgba(148, 163, 184, 0.3)'
+                            : 'rgba(66, 69, 240, 0.3)',
+                        borderRadius: BORDER_RADIUS.md,
+                        paddingHorizontal: SPACING.sm,
+                        paddingVertical: SPACING.xs / 2,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: '600',
+                          color: selectedSchedule.status === 'completed'
+                            ? COLORS.accent.green
+                            : selectedSchedule.status === 'off'
+                              ? COLORS.text.secondary
+                              : COLORS.primary,
+                        }}
+                      >
+                        {selectedSchedule.status === 'completed' ? t.schedule.detail.completed
+                          : selectedSchedule.status === 'off' ? t.schedule.detail.off
+                            : selectedSchedule.status === 'missed' ? t.schedule.detail.missed
+                              : t.schedule.detail.scheduled}
+                      </Text>
+                    </View>
+                  </View>
 
-                      {/* Break Time */}
+                  <View>
+                    {/* Shift Name */}
+                    {selectedSchedule.shiftName && (
                       <View
                         style={{
                           flexDirection: 'row',
@@ -619,6 +591,7 @@ export default function ScheduleScreen() {
                           padding: SPACING.md,
                           borderRadius: BORDER_RADIUS.lg,
                           backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                          marginBottom: SPACING.sm,
                         }}
                       >
                         <View
@@ -632,73 +605,211 @@ export default function ScheduleScreen() {
                             marginRight: SPACING.md,
                           }}
                         >
-                          <Icon name="coffee" size={20} color={COLORS.accent.cyan} />
+                          <Icon name="badge" size={20} color={COLORS.accent.cyan} />
                         </View>
                         <View>
                           <Text
                             style={{
                               fontSize: 11,
-                              color: COLORS.text.secondary,
+                              color: theme.text.secondary,
                               marginBottom: SPACING.xs / 2,
                             }}
                           >
-                            Thời gian nghỉ
+                            {t.schedule.detail.shiftName}
                           </Text>
                           <Text
                             style={{
                               fontSize: 14,
                               fontWeight: '500',
-                              color: COLORS.text.primary,
+                              color: theme.text.primary,
                             }}
                           >
-                            {selectedShift.break}
+                            {selectedSchedule.shiftName}
                           </Text>
                         </View>
                       </View>
-                    </View>
-                  </View>
-                </View>
-              )
-            }
+                    )}
 
-            {/* No Shift Message */}
-            {
-              !selectedShift && selectedDate && (
-                <View style={{ paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg }}>
-                  <View
-                    style={{
-                      backgroundColor: 'rgba(30, 41, 59, 0.6)',
-                      borderRadius: BORDER_RADIUS.xl,
-                      padding: SPACING.xxl,
-                      borderWidth: 1,
-                      borderColor: 'rgba(148, 163, 184, 0.1)',
-                      alignItems: 'center',
-                      ...SHADOWS.lg,
-                    }}
-                  >
+                    {/* Working Hours */}
                     <View
                       style={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 16,
-                        backgroundColor: 'rgba(148, 163, 184, 0.2)',
-                        justifyContent: 'center',
+                        flexDirection: 'row',
                         alignItems: 'center',
-                        marginBottom: SPACING.md,
+                        padding: SPACING.md,
+                        borderRadius: BORDER_RADIUS.lg,
+                        backgroundColor: 'rgba(66, 69, 240, 0.1)',
+                        marginBottom: SPACING.sm,
                       }}
                     >
-                      <Icon name="schedule" size={32} color={COLORS.text.secondary} />
+                      <View
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 12,
+                          backgroundColor: 'rgba(66, 69, 240, 0.2)',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: SPACING.md,
+                        }}
+                      >
+                        <Icon name="schedule" size={20} color={COLORS.primary} />
+                      </View>
+                      <View>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: theme.text.secondary,
+                            marginBottom: SPACING.xs / 2,
+                          }}
+                        >
+                          Giờ làm việc
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: '500',
+                            color: theme.text.primary,
+                          }}
+                        >
+                          {selectedSchedule.startTime} - {selectedSchedule.endTime}
+                        </Text>
+                      </View>
                     </View>
-                    <Text style={{ fontSize: 14, color: COLORS.text.secondary, textAlign: 'center' }}>
-                      Không có ca làm việc trong ngày này
-                    </Text>
+
+                    {/* Attendance Info (if available) */}
+                    {selectedAttendance && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          padding: SPACING.md,
+                          borderRadius: BORDER_RADIUS.lg,
+                          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                          marginBottom: SPACING.sm,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 12,
+                            backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: SPACING.md,
+                          }}
+                        >
+                          <Icon name="check_circle" size={20} color={COLORS.accent.green} />
+                        </View>
+                        <View>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: theme.text.secondary,
+                              marginBottom: SPACING.xs / 2,
+                            }}
+                          >
+                            {t.schedule.detail.attendance}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: '500',
+                              color: theme.text.primary,
+                            }}
+                          >
+                            {selectedAttendance.checkIn || '—'} → {selectedAttendance.checkOut || '—'}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Location */}
+                    {selectedSchedule.location && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          padding: SPACING.md,
+                          borderRadius: BORDER_RADIUS.lg,
+                          backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 12,
+                            backgroundColor: 'rgba(249, 115, 22, 0.2)',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: SPACING.md,
+                          }}
+                        >
+                          <Icon name="location_on" size={20} color={COLORS.accent.yellow} />
+                        </View>
+                        <View>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: theme.text.secondary,
+                              marginBottom: SPACING.xs / 2,
+                            }}
+                          >
+                            {t.schedule.detail.location}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: '500',
+                              color: theme.text.primary,
+                            }}
+                          >
+                            {selectedSchedule.location}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </View>
-              )
-            }
+              </View>
+            )}
+
+            {/* No Shift Message (when selected a day with no schedule) */}
+            {!selectedSchedule && selectedDate && (
+              <View style={{ paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg }}>
+                <View
+                  style={{
+                    backgroundColor: theme.surface,
+                    borderRadius: BORDER_RADIUS.xl,
+                    padding: SPACING.xxl,
+                    borderWidth: 1,
+                    borderColor: theme.cardBorder,
+                    alignItems: 'center',
+                    ...SHADOWS.lg,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 16,
+                      backgroundColor: 'rgba(148, 163, 184, 0.2)',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginBottom: SPACING.md,
+                    }}
+                  >
+                    <Icon name="schedule" size={32} color={theme.text.secondary} />
+                  </View>
+                  <Text style={{ fontSize: 14, color: theme.text.secondary, textAlign: 'center' }}>
+                    {t.schedule.noShift}
+                  </Text>
+                </View>
+              </View>
+            )}
           </>
-        )
-        }
+        )}
       </ScrollView>
     </View>
   );

@@ -12,7 +12,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import { EmployeeTabParamList } from '../../navigation/AppNavigator';
-import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
+import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../../utils/styles';
+import { useTranslation } from '../../i18n';
 import { Icon } from '../../components/Icon';
 import { DateTimePickerWrapper } from '../../components/DateTimePickerWrapper';
 
@@ -34,6 +35,8 @@ interface LeaveRequest {
 }
 
 export default function RequestsScreen({ navigation }: RequestsScreenProps) {
+  const theme = useTheme();
+  const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [leaveType, setLeaveType] = useState('');
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -70,12 +73,12 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const leaveTypes = [
-    'Nghỉ phép năm',
-    'Nghỉ ốm',
-    'Nghỉ không lương',
-    'Đăng ký tăng ca',
-    'Nghỉ bù',
-    'Nghỉ thai sản'
+    t.requests.leaveTypes.annual,
+    t.requests.leaveTypes.sick,
+    t.requests.leaveTypes.unpaid,
+    t.requests.leaveTypes.overtime,
+    t.requests.leaveTypes.compensatory,
+    t.requests.leaveTypes.maternity,
   ];
 
   // Map Vietnamese labels to canonical API codes
@@ -146,7 +149,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
 
   const handleSubmitRequest = async () => {
     if (!leaveType || !reason) {
-      alert('Vui lòng điền đầy đủ thông tin');
+      alert(t.requests.fillAll);
       return;
     }
 
@@ -164,7 +167,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
         reason: reason,
       });
 
-      alert('Gửi đơn thành công!');
+      alert(t.requests.submitSuccess);
       setIsDialogOpen(false);
       setLeaveType('');
       setReason('');
@@ -172,7 +175,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
 
     } catch (error: any) {
       console.error('Submit leave error', error);
-      alert(error.response?.data?.message || 'Gửi đơn thất bại');
+      alert(error.response?.data?.message || t.requests.submitError);
     } finally {
       setIsSubmitting(false);
     }
@@ -203,7 +206,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                 marginLeft: SPACING.xs / 2,
               }}
             >
-              Đã duyệt
+              {t.requests.status.approved}
             </Text>
           </View>
         );
@@ -230,7 +233,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                 marginLeft: SPACING.xs / 2,
               }}
             >
-              Từ chối
+              {t.requests.status.rejected}
             </Text>
           </View>
         );
@@ -257,7 +260,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                 marginLeft: SPACING.xs / 2,
               }}
             >
-              Chờ duyệt
+              {t.requests.status.pending}
             </Text>
           </View>
         );
@@ -278,7 +281,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
 
   return (
     <ScrollView
-      style={globalStyles.container}
+      style={[globalStyles.container, { backgroundColor: theme.background }]}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 100 }}
     >
@@ -329,12 +332,12 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                 marginRight: SPACING.xs,
               }}
             >
-              Nghỉ phép & Đơn từ
+              {t.requests.title}
             </Text>
             <Icon name="auto_awesome" size={20} color={COLORS.accent.cyan} />
           </View>
           <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>
-            Quản lý các đơn xin nghỉ
+            {t.requests.subtitle}
           </Text>
         </View>
       </LinearGradient>
@@ -353,11 +356,11 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
             style={{
               fontSize: 14,
               fontWeight: '600',
-              color: COLORS.text.primary,
+              color: theme.text.primary,
               marginLeft: SPACING.sm,
             }}
           >
-            Số ngày phép còn lại
+            {t.requests.balance}
           </Text>
         </View>
 
@@ -367,19 +370,19 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
               key={item.id}
               style={{
                 width: '48%',
-                backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                backgroundColor: theme.cardBg,
                 borderRadius: BORDER_RADIUS.lg,
                 padding: SPACING.md,
                 marginBottom: SPACING.md,
                 borderWidth: 1,
-                borderColor: 'rgba(148, 163, 184, 0.1)',
+                borderColor: theme.cardBorder,
                 ...SHADOWS.md,
               }}
             >
               <Text
                 style={{
                   fontSize: 12,
-                  color: COLORS.text.secondary,
+                  color: theme.text.secondary,
                   marginBottom: SPACING.xs,
                   height: 32, // Fixed height for alignment
                 }}
@@ -396,8 +399,8 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
               >
                 {item.remaining}
               </Text>
-              <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                ngày
+              <Text style={{ fontSize: 11, color: theme.text.secondary }}>
+                {t.common.day}
               </Text>
             </View>
           ))}
@@ -428,10 +431,10 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
             style={{
               fontSize: 14,
               fontWeight: '600',
-              color: COLORS.text.primary,
+              color: theme.text.primary,
             }}
           >
-            Lịch sử đơn từ
+            {t.requests.history}
           </Text>
         </View>
         <View>
@@ -439,12 +442,12 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
             <View
               key={request.id}
               style={{
-                backgroundColor: 'rgba(30, 41, 59, 0.6)',
+                backgroundColor: theme.cardBg,
                 borderRadius: BORDER_RADIUS.lg,
                 padding: SPACING.md,
                 marginBottom: SPACING.md,
                 borderWidth: 1,
-                borderColor: 'rgba(148, 163, 184, 0.1)',
+                borderColor: theme.cardBorder,
                 ...SHADOWS.md,
               }}
             >
@@ -461,14 +464,14 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                     style={{
                       fontSize: 14,
                       fontWeight: '600',
-                      color: COLORS.text.primary,
+                      color: theme.text.primary,
                       marginBottom: SPACING.xs / 2,
                     }}
                   >
                     {request.type}
                   </Text>
-                  <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-                    Gửi ngày {formatDate(request.submittedDate)}
+                  <Text style={{ fontSize: 11, color: theme.text.secondary }}>
+                    {t.requests.submittedOn} {formatDate(request.submittedDate)}
                   </Text>
                 </View>
                 {getStatusBadge(request.status)}
@@ -488,10 +491,10 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                   <Icon
                     name="event"
                     size={16}
-                    color={COLORS.text.secondary}
+                    color={theme.text.secondary}
                     style={{ marginRight: SPACING.sm }}
                   />
-                  <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+                  <Text style={{ fontSize: 12, color: theme.text.secondary }}>
                     {formatDate(request.startDate)} - {formatDate(request.endDate)}
                   </Text>
                 </View>
@@ -507,13 +510,13 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                   <Icon
                     name="assignment"
                     size={16}
-                    color={COLORS.text.secondary}
+                    color={theme.text.secondary}
                     style={{ marginRight: SPACING.sm, marginTop: 2 }}
                   />
                   <Text
                     style={{
                       fontSize: 12,
-                      color: COLORS.text.secondary,
+                      color: theme.text.secondary,
                       flex: 1,
                     }}
                   >
@@ -541,7 +544,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                       marginBottom: SPACING.xs / 2,
                     }}
                   >
-                    Lý do từ chối:
+                    {t.requests.rejectionReason}
                   </Text>
                   <Text style={{ fontSize: 11, color: COLORS.accent.red, opacity: 0.8 }}>
                     {request.rejectionReason}
@@ -569,7 +572,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
         >
           <View
             style={{
-              backgroundColor: COLORS.surface.dark,
+              backgroundColor: theme.surface,
               borderTopLeftRadius: BORDER_RADIUS.xl,
               borderTopRightRadius: BORDER_RADIUS.xl,
               padding: SPACING.lg,
@@ -590,18 +593,18 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                   style={{
                     fontSize: 18,
                     fontWeight: '600',
-                    color: COLORS.text.primary,
+                    color: theme.text.primary,
                     marginBottom: SPACING.xs / 2,
                   }}
                 >
-                  Tạo đơn xin nghỉ
+                  {t.requests.create}
                 </Text>
-                <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                  Điền thông tin đơn xin nghỉ của bạn
+                <Text style={{ fontSize: 12, color: theme.text.secondary }}>
+                  {t.requests.createSubtitle}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setIsDialogOpen(false)}>
-                <Icon name="close" size={24} color={COLORS.text.primary} />
+                <Icon name="close" size={24} color={theme.text.primary} />
               </TouchableOpacity>
             </View>
 
@@ -612,16 +615,16 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                   style={{
                     fontSize: 12,
                     fontWeight: '500',
-                    color: COLORS.text.primary,
+                    color: theme.text.primary,
                     marginBottom: SPACING.sm,
                   }}
                 >
-                  Loại đơn
+                  {t.requests.type}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setShowLeaveTypePicker(true)}
                   style={{
-                    backgroundColor: COLORS.surface.darker,
+                    backgroundColor: theme.surfaceDarker,
                     borderRadius: BORDER_RADIUS.lg,
                     borderWidth: 1,
                     borderColor: 'rgba(148, 163, 184, 0.2)',
@@ -634,11 +637,11 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                 >
                   <Text
                     style={{
-                      color: leaveType ? COLORS.text.primary : COLORS.text.secondary,
+                      color: leaveType ? theme.text.primary : theme.text.secondary,
                       fontSize: 16,
                     }}
                   >
-                    {leaveType || 'Chọn loại đơn'}
+                    {leaveType || t.requests.selectType}
                   </Text>
                   <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
                 </TouchableOpacity>
@@ -662,7 +665,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                   >
                     <View
                       style={{
-                        backgroundColor: COLORS.surface.dark,
+                        backgroundColor: theme.surface,
                         borderRadius: BORDER_RADIUS.xl,
                         padding: SPACING.md,
                         width: '80%',
@@ -692,7 +695,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                               color:
                                 leaveType === type
                                   ? COLORS.primary
-                                  : COLORS.text.primary,
+                                  : theme.text.primary,
                               fontSize: 16,
                               fontWeight: leaveType === type ? '600' : '400',
                             }}
@@ -718,16 +721,16 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                     style={{
                       fontSize: 12,
                       fontWeight: '500',
-                      color: COLORS.text.primary,
+                      color: theme.text.primary,
                       marginBottom: SPACING.sm,
                     }}
                   >
-                    Từ ngày
+                    {t.requests.fromDate}
                   </Text>
                   <TouchableOpacity
                     onPress={() => setShowStartDatePicker(true)}
                     style={{
-                      backgroundColor: COLORS.surface.darker,
+                      backgroundColor: theme.surfaceDarker,
                       borderRadius: BORDER_RADIUS.lg,
                       borderWidth: 1,
                       borderColor: 'rgba(148, 163, 184, 0.2)',
@@ -735,7 +738,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                       paddingHorizontal: SPACING.md,
                     }}
                   >
-                    <Text style={{ color: COLORS.text.primary, fontSize: 16 }}>
+                    <Text style={{ color: theme.text.primary, fontSize: 16 }}>
                       {formatDateForInput(startDate)}
                     </Text>
                   </TouchableOpacity>
@@ -760,16 +763,16 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                     style={{
                       fontSize: 12,
                       fontWeight: '500',
-                      color: COLORS.text.primary,
+                      color: theme.text.primary,
                       marginBottom: SPACING.sm,
                     }}
                   >
-                    Đến ngày
+                    {t.requests.toDate}
                   </Text>
                   <TouchableOpacity
                     onPress={() => setShowEndDatePicker(true)}
                     style={{
-                      backgroundColor: COLORS.surface.darker,
+                      backgroundColor: theme.surfaceDarker,
                       borderRadius: BORDER_RADIUS.lg,
                       borderWidth: 1,
                       borderColor: 'rgba(148, 163, 184, 0.2)',
@@ -777,7 +780,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                       paddingHorizontal: SPACING.md,
                     }}
                   >
-                    <Text style={{ color: COLORS.text.primary, fontSize: 16 }}>
+                    <Text style={{ color: theme.text.primary, fontSize: 16 }}>
                       {formatDateForInput(endDate)}
                     </Text>
                   </TouchableOpacity>
@@ -809,14 +812,14 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                       }}
                       onBlur={() => setShowEndDatePicker(false)}
                       placeholder="YYYY-MM-DD"
-                      placeholderTextColor={COLORS.text.secondary}
+                      placeholderTextColor={theme.text.secondary}
                       style={{
-                        backgroundColor: COLORS.surface.darker,
+                        backgroundColor: theme.surfaceDarker,
                         borderRadius: BORDER_RADIUS.lg,
                         borderWidth: 1,
-                        borderColor: 'rgba(148, 163, 184, 0.2)',
+                        borderColor: theme.inputBorder,
                         padding: SPACING.md,
-                        color: COLORS.text.primary,
+                        color: theme.text.primary,
                         fontSize: 16,
                         marginTop: SPACING.sm,
                       }}
@@ -831,26 +834,26 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                   style={{
                     fontSize: 12,
                     fontWeight: '500',
-                    color: COLORS.text.primary,
+                    color: theme.text.primary,
                     marginBottom: SPACING.sm,
                   }}
                 >
-                  Lý do
+                  {t.requests.reason}
                 </Text>
                 <TextInput
-                  placeholder="Nhập lý do xin nghỉ..."
-                  placeholderTextColor={COLORS.text.secondary}
+                  placeholder={t.requests.reasonPlaceholder}
+                  placeholderTextColor={theme.text.secondary}
                   value={reason}
                   onChangeText={setReason}
                   multiline
                   numberOfLines={4}
                   style={{
-                    backgroundColor: COLORS.surface.darker,
+                    backgroundColor: theme.surfaceDarker,
                     borderRadius: BORDER_RADIUS.lg,
                     borderWidth: 1,
-                    borderColor: 'rgba(148, 163, 184, 0.2)',
+                    borderColor: theme.inputBorder,
                     padding: SPACING.md,
-                    color: COLORS.text.primary,
+                    color: theme.text.primary,
                     fontSize: 16,
                     minHeight: 100,
                     textAlignVertical: 'top',
@@ -881,7 +884,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                       fontWeight: '600',
                     }}
                   >
-                    Gửi đơn
+                    {t.requests.submit}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>

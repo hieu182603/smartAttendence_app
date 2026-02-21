@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Icon } from './Icon';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
+import { useTranslation } from '../i18n';
 
 interface TabItem {
   name: string;
@@ -12,12 +13,13 @@ interface TabItem {
 }
 
 export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { t } = useTranslation();
   const employeeItems: TabItem[] = [
-    { name: 'Home', icon: 'home', label: 'Home' },
-    { name: 'Schedule', icon: 'calendar_month', label: 'Schedule' },
-    { name: 'Requests', icon: 'assignment', label: 'Requests' },
-    { name: 'Leaves', icon: 'assignment', label: 'Ngày nghỉ' },
-    { name: 'Profile', icon: 'person', label: 'Profile' },
+    { name: 'Home', icon: 'home', label: t.nav.home },
+    { name: 'Schedule', icon: 'calendar_month', label: t.nav.schedule },
+    { name: 'Requests', icon: 'assignment', label: t.requests.title },
+    { name: 'Leaves', icon: 'assignment', label: t.nav.leaves },
+    { name: 'Profile', icon: 'person', label: t.nav.profile },
   ];
 
   return (

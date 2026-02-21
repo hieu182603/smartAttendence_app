@@ -1,7 +1,12 @@
 import { StyleSheet, Dimensions } from 'react-native';
+import { usePreferences } from '../context/PreferencesContext';
+import { useMemo } from 'react';
 
 const { width, height } = Dimensions.get('window');
 
+// ──────────────────────────────────────────────────────────
+// Static COLORS — kept as default dark theme for backward compatibility
+// ──────────────────────────────────────────────────────────
 export const COLORS = {
   // Primary colors
   primary: '#4245f0',
@@ -45,6 +50,87 @@ export const COLORS = {
     info: '#06b6d4',
   },
 };
+
+// ──────────────────────────────────────────────────────────
+// Theme-aware colors
+// ──────────────────────────────────────────────────────────
+export interface ThemeColors {
+  primary: string;
+  primaryDark: string;
+  primaryLight: string;
+  background: string;
+  surface: string;
+  surfaceDarker: string;
+  text: {
+    primary: string;
+    secondary: string;
+    muted: string;
+  };
+  accent: typeof COLORS.accent;
+  status: typeof COLORS.status;
+  // Helpers for common semi-transparent backgrounds
+  cardBg: string;
+  cardBorder: string;
+  glassPanel: string;
+  divider: string;
+  inputBg: string;
+  inputBorder: string;
+}
+
+const DARK_THEME: ThemeColors = {
+  primary: '#4245f0',
+  primaryDark: '#3538cd',
+  primaryLight: '#6366f2',
+  background: '#101122',
+  surface: '#1e1f3a',
+  surfaceDarker: '#17182e',
+  text: {
+    primary: '#ffffff',
+    secondary: '#9293c9',
+    muted: '#666666',
+  },
+  accent: COLORS.accent,
+  status: COLORS.status,
+  cardBg: 'rgba(30, 41, 59, 0.6)',
+  cardBorder: 'rgba(148, 163, 184, 0.1)',
+  glassPanel: 'rgba(30, 31, 58, 0.6)',
+  divider: 'rgba(148, 163, 184, 0.1)',
+  inputBg: '#17182e',
+  inputBorder: 'rgba(255, 255, 255, 0.1)',
+};
+
+const LIGHT_THEME: ThemeColors = {
+  primary: '#4245f0',
+  primaryDark: '#3538cd',
+  primaryLight: '#6366f2',
+  background: '#f6f6f8',
+  surface: '#ffffff',
+  surfaceDarker: '#f0f1f5',
+  text: {
+    primary: '#1a1a2e',
+    secondary: '#6b7280',
+    muted: '#9ca3af',
+  },
+  accent: COLORS.accent,
+  status: COLORS.status,
+  cardBg: '#ffffff',
+  cardBorder: 'rgba(0, 0, 0, 0.08)',
+  glassPanel: 'rgba(255, 255, 255, 0.8)',
+  divider: 'rgba(0, 0, 0, 0.06)',
+  inputBg: '#f0f1f5',
+  inputBorder: 'rgba(0, 0, 0, 0.1)',
+};
+
+/**
+ * Hook that returns theme-aware colors based on user preference.
+ * Use in any screen/component:
+ *   const theme = useTheme();
+ *   style={{ backgroundColor: theme.background }}
+ */
+export function useTheme(): ThemeColors {
+  const { isDarkMode } = usePreferences();
+  return useMemo(() => (isDarkMode ? DARK_THEME : LIGHT_THEME), [isDarkMode]);
+}
 
 export const SPACING = {
   xs: 4,

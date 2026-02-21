@@ -13,7 +13,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
+import { usePreferences } from '../context/PreferencesContext';
+import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../utils/styles';
+import { useTranslation } from '../i18n';
 import { Icon } from '../components/Icon';
 import { UserService } from '../services/user.service';
 
@@ -37,10 +39,11 @@ interface UserInfo {
 
 export default function ProfileScreen() {
   const { logout, user } = useAuth();
+  const { isDarkMode, toggleDarkMode, notificationsEnabled, toggleNotifications } = usePreferences();
+  const theme = useTheme();
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const [showSalary, setShowSalary] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
 
   // Edit dialogs state
   const [showEditPersonal, setShowEditPersonal] = useState(false);
@@ -147,9 +150,9 @@ export default function ProfileScreen() {
   if (!userInfo) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: COLORS.text.secondary }}>Không thể tải thông tin người dùng</Text>
+        <Text style={{ color: COLORS.text.secondary }}>{t.profile.loadError}</Text>
         <TouchableOpacity onPress={() => { setLoading(true); fetchProfile(); }} style={{ padding: 10, marginTop: 10 }}>
-          <Text style={{ color: COLORS.primary }}>Thử lại</Text>
+          <Text style={{ color: COLORS.primary }}>{t.common.retry}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -203,7 +206,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
-      style={globalStyles.container}
+      style={[globalStyles.container, { backgroundColor: theme.background }]}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 100 }}
     >
@@ -304,7 +307,7 @@ export default function ProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs / 2 }}>
-                  Họ và tên
+                  {t.profile.fullName}
                 </Text>
                 <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500' }}>
                   {userInfo.name}
@@ -335,7 +338,7 @@ export default function ProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs / 2 }}>
-                  Chức vụ
+                  {t.profile.position}
                 </Text>
                 <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500' }}>
                   {userInfo.position}
@@ -366,7 +369,7 @@ export default function ProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs / 2 }}>
-                  Phòng ban
+                  {t.profile.department}
                 </Text>
                 <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500' }}>
                   {userInfo.department}
@@ -435,7 +438,7 @@ export default function ProfileScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs / 2 }}>
-                  Số điện thoại
+                  {t.profile.phone}
                 </Text>
                 <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500' }}>
                   {userInfo.phone}
@@ -465,7 +468,7 @@ export default function ProfileScreen() {
                 marginLeft: SPACING.sm,
               }}
             >
-              Chỉnh sửa thông tin cá nhân
+              {t.profile.editPersonal}
             </Text>
           </TouchableOpacity>
         </View>
@@ -491,7 +494,7 @@ export default function ProfileScreen() {
               marginBottom: SPACING.md,
             }}
           >
-            Thông tin lương
+            {t.profile.payrollInfo}
           </Text>
           <View>
             {/* Salary */}
@@ -519,7 +522,7 @@ export default function ProfileScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs / 2 }}>
-                    Lương cơ bản
+                    {t.profile.basicSalary}
                   </Text>
                   <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500' }}>
                     {showSalary
@@ -550,7 +553,7 @@ export default function ProfileScreen() {
               }}
             >
               <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs }}>
-                Mã số thuế
+                {t.profile.taxCode}
               </Text>
               <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500' }}>
                 {userInfo.salary.taxCode}
@@ -566,7 +569,7 @@ export default function ProfileScreen() {
               }}
             >
               <Text style={{ fontSize: 11, color: COLORS.text.secondary, marginBottom: SPACING.xs }}>
-                Thông tin ngân hàng
+                {t.profile.bankInfo}
               </Text>
               <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500', marginBottom: SPACING.xs / 2 }}>
                 {userInfo.bankInfo.name}
@@ -598,7 +601,7 @@ export default function ProfileScreen() {
                 marginLeft: SPACING.sm,
               }}
             >
-              Chỉnh sửa thông tin lương
+              {t.profile.editPayroll}
             </Text>
           </TouchableOpacity>
         </View>
@@ -624,7 +627,7 @@ export default function ProfileScreen() {
               marginBottom: SPACING.md,
             }}
           >
-            Cài đặt ứng dụng
+            {t.profile.appSettings}
           </Text>
           <View>
             {/* Notifications */}
@@ -652,16 +655,16 @@ export default function ProfileScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500', marginBottom: SPACING.xs / 2 }}>
-                    Thông báo
+                    {t.profile.pushNotifications}
                   </Text>
                   <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                    Nhận thông báo push
+                    {t.profile.pushNotificationsDesc}
                   </Text>
                 </View>
               </View>
               <Switch
                 value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+                onValueChange={toggleNotifications}
                 trackColor={{ false: COLORS.surface.darker, true: COLORS.primary }}
                 thumbColor="#ffffff"
               />
@@ -691,16 +694,16 @@ export default function ProfileScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, color: COLORS.text.primary, fontWeight: '500', marginBottom: SPACING.xs / 2 }}>
-                    Chế độ tối
+                    {t.profile.darkModeLabel}
                   </Text>
                   <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
-                    Giao diện tối
+                    {t.profile.darkModeDesc}
                   </Text>
                 </View>
               </View>
               <Switch
-                value={darkMode}
-                onValueChange={setDarkMode}
+                value={isDarkMode}
+                onValueChange={toggleDarkMode}
                 trackColor={{ false: COLORS.surface.darker, true: COLORS.primary }}
                 thumbColor="#ffffff"
               />
@@ -729,7 +732,7 @@ export default function ProfileScreen() {
               marginBottom: SPACING.md,
             }}
           >
-            Tài khoản
+            {t.profile.account}
           </Text>
 
           {/* Change Password */}
@@ -765,7 +768,7 @@ export default function ProfileScreen() {
                   fontWeight: '500',
                 }}
               >
-                Đổi mật khẩu
+                {t.profile.changePassword}
               </Text>
             </View>
             <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
@@ -802,7 +805,7 @@ export default function ProfileScreen() {
                   fontWeight: '500',
                 }}
               >
-                Cài đặt ứng dụng
+                {t.profile.settings}
               </Text>
             </View>
             <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
@@ -833,7 +836,7 @@ export default function ProfileScreen() {
               marginLeft: SPACING.sm,
             }}
           >
-            Đăng xuất
+            {t.profile.logout}
           </Text>
         </TouchableOpacity>
       </View>
@@ -876,7 +879,7 @@ export default function ProfileScreen() {
                   color: COLORS.text.primary,
                 }}
               >
-                Chỉnh sửa thông tin cá nhân
+                {t.profile.editPersonal}
               </Text>
               <TouchableOpacity onPress={() => setShowEditPersonal(false)}>
                 <Icon name="close" size={24} color={COLORS.text.primary} />
@@ -892,10 +895,10 @@ export default function ProfileScreen() {
                     marginBottom: SPACING.sm,
                   }}
                 >
-                  Họ và tên
+                  {t.profile.fullName}
                 </Text>
                 <TextInput
-                  placeholder="Nhập họ và tên"
+                  placeholder={t.profile.enterName}
                   placeholderTextColor={COLORS.text.secondary}
                   value={editPersonalForm.name}
                   onChangeText={(text) => setEditPersonalForm({ ...editPersonalForm, name: text })}
@@ -922,7 +925,7 @@ export default function ProfileScreen() {
                   Email
                 </Text>
                 <TextInput
-                  placeholder="Nhập email"
+                  placeholder={t.profile.enterEmail}
                   placeholderTextColor={COLORS.text.secondary}
                   value={editPersonalForm.email}
                   onChangeText={(text) => setEditPersonalForm({ ...editPersonalForm, email: text })}
@@ -948,10 +951,10 @@ export default function ProfileScreen() {
                     marginBottom: SPACING.sm,
                   }}
                 >
-                  Số điện thoại
+                  {t.profile.phone}
                 </Text>
                 <TextInput
-                  placeholder="Nhập số điện thoại"
+                  placeholder={t.profile.enterPhone}
                   placeholderTextColor={COLORS.text.secondary}
                   value={editPersonalForm.phone}
                   onChangeText={(text) => setEditPersonalForm({ ...editPersonalForm, phone: text })}
@@ -1041,7 +1044,7 @@ export default function ProfileScreen() {
                   color: COLORS.text.primary,
                 }}
               >
-                Chỉnh sửa thông tin lương
+                {t.profile.editPayroll}
               </Text>
               <TouchableOpacity onPress={() => setShowEditSalary(false)}>
                 <Icon name="close" size={24} color={COLORS.text.primary} />
@@ -1057,7 +1060,7 @@ export default function ProfileScreen() {
                     marginBottom: SPACING.sm,
                   }}
                 >
-                  Lương cơ bản (VNĐ)
+                  {t.profile.basicSalaryLabel}
                 </Text>
                 <TextInput
                   placeholder="15,000,000"
@@ -1085,7 +1088,7 @@ export default function ProfileScreen() {
                     marginBottom: SPACING.sm,
                   }}
                 >
-                  Mã số thuế
+                  {t.profile.taxCode}
                 </Text>
                 <TextInput
                   placeholder="0123456789"
@@ -1113,10 +1116,10 @@ export default function ProfileScreen() {
                     marginBottom: SPACING.sm,
                   }}
                 >
-                  Tên ngân hàng
+                  {t.profile.bankName}
                 </Text>
                 <TextInput
-                  placeholder="Ngân hàng Vietcombank"
+                  placeholder={t.profile.enterBankName}
                   placeholderTextColor={COLORS.text.secondary}
                   value={editSalaryForm.bankName}
                   onChangeText={(text) => setEditSalaryForm({ ...editSalaryForm, bankName: text })}
@@ -1140,7 +1143,7 @@ export default function ProfileScreen() {
                     marginBottom: SPACING.sm,
                   }}
                 >
-                  Số tài khoản
+                  {t.profile.accountNumber}
                 </Text>
                 <TextInput
                   placeholder="1234567890"

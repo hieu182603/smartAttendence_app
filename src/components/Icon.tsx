@@ -100,6 +100,7 @@ const iconMap: { [key: string]: { family: string; name: string } } = {
   lock_open: { family: 'Ionicons', name: 'lock-open' },
   key: { family: 'Ionicons', name: 'key' },
   phone: { family: 'Ionicons', name: 'call' },
+  lock_reset: { family: 'MaterialIcons', name: 'lock-reset' },
 
   // Manager Dashboard icons
   person_check: { family: 'MaterialIcons', name: 'person-check' },

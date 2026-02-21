@@ -7,7 +7,8 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
+import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../utils/styles';
+import { useTranslation } from '../i18n';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -17,6 +18,8 @@ import { useSocket } from '../context/SocketContext';
 export default function NotificationsScreen() {
   const navigation = useNavigation();
   const { socket } = useSocket();
+  const theme = useTheme();
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -107,7 +110,7 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <View style={globalStyles.container}>
+    <View style={[globalStyles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.accent.cyan]}
@@ -137,7 +140,7 @@ export default function NotificationsScreen() {
                 Thông báo
               </Text>
               <Text style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>
-                Cập nhật mới nhất từ hệ thống
+                {t.notifications.subtitle}
               </Text>
             </View>
           </View>
@@ -167,8 +170,8 @@ export default function NotificationsScreen() {
           ) : notifications.length === 0 ? (
             <View style={{ alignItems: 'center', marginTop: SPACING.xl * 2 }}>
               <Icon name="notifications_off" size={48} color={COLORS.text.secondary} />
-              <Text style={{ color: COLORS.text.secondary, marginTop: SPACING.md }}>
-                Không có thông báo nào
+              <Text style={{ color: theme.text.secondary, marginTop: SPACING.md }}>
+                {t.notifications.empty}
               </Text>
             </View>
           ) : (
@@ -179,7 +182,7 @@ export default function NotificationsScreen() {
                   key={item.id}
                   onPress={() => item.unread && markAsRead(item.id)}
                   style={{
-                    backgroundColor: item.unread ? 'rgba(30, 41, 59, 0.8)' : 'rgba(30, 41, 59, 0.4)',
+                    backgroundColor: item.unread ? theme.surface : theme.surfaceDarker,
                     borderRadius: BORDER_RADIUS.lg,
                     padding: SPACING.md,
                     marginBottom: SPACING.md,
@@ -204,14 +207,14 @@ export default function NotificationsScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.xs }}>
-                      <Text style={{ color: COLORS.text.primary, fontWeight: '600', flex: 1 }}>
+                      <Text style={{ color: theme.text.primary, fontWeight: '600', flex: 1 }}>
                         {item.title}
                       </Text>
-                      <Text style={{ color: COLORS.text.secondary, fontSize: 12 }}>
+                      <Text style={{ color: theme.text.secondary, fontSize: 12 }}>
                         {item.time}
                       </Text>
                     </View>
-                    <Text style={{ color: COLORS.text.secondary, fontSize: 13, lineHeight: 20 }}>
+                    <Text style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 20 }}>
                       {item.message}
                     </Text>
                   </View>
