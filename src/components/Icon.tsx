@@ -116,6 +116,20 @@ const iconMap: { [key: string]: { family: string; name: string } } = {
   // Alerts
   alarm: { family: 'Ionicons', name: 'alarm' },
   cancel: { family: 'MaterialIcons', name: 'cancel' },
+  notifications_off: { family: 'MaterialIcons', name: 'notifications-off' },
+
+  // Admin & Settings Missing Icons
+  arrow_drop_down: { family: 'MaterialIcons', name: 'arrow-drop-down' },
+  person_add: { family: 'MaterialIcons', name: 'person-add' },
+  more_vert: { family: 'MaterialIcons', name: 'more-vert' },
+  bolt: { family: 'MaterialIcons', name: 'bolt' },
+  badge: { family: 'MaterialIcons', name: 'badge' },
+  send: { family: 'MaterialIcons', name: 'send' },
+  language: { family: 'MaterialIcons', name: 'language' },
+  fingerprint: { family: 'MaterialIcons', name: 'fingerprint' },
+  delete_sweep: { family: 'MaterialIcons', name: 'delete-sweep' },
+  description: { family: 'MaterialIcons', name: 'description' },
+  privacy_tip: { family: 'MaterialIcons', name: 'privacy-tip' },
 };
 
 export const Icon: React.FC<IconProps> = ({

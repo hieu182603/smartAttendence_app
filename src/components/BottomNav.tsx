@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Icon } from './Icon';
@@ -81,11 +81,11 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
             // we don't need manual margins anymore.
 
             return (
-              <TouchableOpacity
+              <Pressable
                 key={item.name}
                 onPress={onPress}
                 style={tabItemStyle}
-                activeOpacity={0.7}
+                android_ripple={null}
               >
                 <View style={[
                   styles.iconContainer,
@@ -103,7 +103,7 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
                 ]}>
                   {item.label}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
         </View>
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   iconContainerActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'transparent',
   },
   tabLabel: {
     fontSize: 10,

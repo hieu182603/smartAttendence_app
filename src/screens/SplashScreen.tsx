@@ -1,10 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, Dimensions } from 'react-native';
+import { View, Text, Animated, Dimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { globalStyles, COLORS } from '../utils/styles';
-import { Icon } from '../components/Icon';
+import { globalStyles, COLORS, useTheme } from '../utils/styles';
 
 type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Splash'>;
 
@@ -15,6 +14,7 @@ interface SplashScreenProps {
 const { width, height } = Dimensions.get('window');
 
 export default function SplashScreen({ navigation }: SplashScreenProps) {
+  const theme = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
@@ -49,12 +49,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
   }, [navigation, fadeAnim, scaleAnim, slideAnim]);
 
   return (
-    <LinearGradient
-      colors={[COLORS.primary, COLORS.accent.cyan]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={globalStyles.container}
-    >
+    <View style={[globalStyles.container, { backgroundColor: theme.background }]}>
       <Animated.View
         style={[
           {
@@ -66,38 +61,70 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
           },
         ]}
       >
-        {/* Logo/Icon */}
+        {/* Decorative background circles */}
+        <View style={{
+          position: 'absolute',
+          top: -100,
+          right: -50,
+          width: 300,
+          height: 300,
+          borderRadius: 150,
+          backgroundColor: 'rgba(66, 69, 240, 0.05)',
+        }} />
+        <View style={{
+          position: 'absolute',
+          bottom: -50,
+          left: -100,
+          width: 250,
+          height: 250,
+          borderRadius: 125,
+          backgroundColor: 'rgba(34, 211, 238, 0.05)',
+        }} />
+
+        {/* Logo Container with Glow */}
         <Animated.View
           style={[
             {
-              width: 120,
-              height: 120,
-              borderRadius: 30,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              width: 140,
+              height: 140,
+              borderRadius: 35,
+              backgroundColor: theme.surface,
               justifyContent: 'center',
               alignItems: 'center',
-              marginBottom: 32,
+              marginBottom: 40,
               transform: [{ translateY: slideAnim }],
+              shadowColor: COLORS.primary,
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.3,
+              shadowRadius: 20,
+              elevation: 10,
+              borderWidth: 1,
+              borderColor: 'rgba(66, 69, 240, 0.2)',
             },
           ]}
         >
-          <Icon name="business" size={60} color="#ffffff" />
+          <Image
+            source={require('../../assets/icon.png')}
+            style={{ width: 90, height: 90, borderRadius: 20 }}
+            resizeMode="cover"
+          />
         </Animated.View>
 
         {/* App Name */}
         <Animated.Text
           style={[
             {
-              fontSize: 32,
-              fontWeight: 'bold',
-              color: '#ffffff',
+              fontSize: 36,
+              fontWeight: '800',
+              color: COLORS.text.primary,
               textAlign: 'center',
-              marginBottom: 8,
+              marginBottom: 12,
+              letterSpacing: 0.5,
               transform: [{ translateY: slideAnim }],
             },
           ]}
         >
-          SmartAttendance
+          Smatt
         </Animated.Text>
 
         {/* Tagline */}
@@ -105,21 +132,23 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
           style={[
             {
               fontSize: 16,
-              color: 'rgba(255, 255, 255, 0.8)',
+              color: COLORS.text.secondary,
               textAlign: 'center',
+              fontWeight: '500',
+              letterSpacing: 0.5,
               transform: [{ translateY: slideAnim }],
             },
           ]}
         >
-          Smart Employee Management
+          Quản Lý Nhân Sự Thông Minh
         </Animated.Text>
 
-        {/* Loading dots */}
+        {/* Loading indicator */}
         <Animated.View
           style={[
             {
               flexDirection: 'row',
-              marginTop: 40,
+              marginTop: 60,
               transform: [{ translateY: slideAnim }],
             },
           ]}
@@ -129,17 +158,17 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
               key={index}
               style={[
                 {
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: '#ffffff',
-                  marginHorizontal: 4,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: COLORS.primary,
+                  marginHorizontal: 6,
                   opacity: fadeAnim,
                   transform: [
                     {
                       scale: fadeAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0.5, 1],
+                        outputRange: [0.3, 1],
                       }),
                     },
                   ],
@@ -149,7 +178,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
           ))}
         </Animated.View>
       </Animated.View>
-    </LinearGradient>
+    </View>
   );
 }
 

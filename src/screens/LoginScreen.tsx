@@ -302,7 +302,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="vidu@company.com"
+                placeholder="email@company.com"
                 placeholderTextColor="rgba(148, 163, 184, 0.5)"
                 selectionColor={COLORS.primary}
                 style={[

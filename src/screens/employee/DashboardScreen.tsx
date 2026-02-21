@@ -54,24 +54,59 @@ export default function DashboardScreen() {
 
   const [activities, setActivities] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
-      // Parallel fetching for performance
-      const [balance, recentAttendance, notificationsData] = await Promise.all([
-        LeaveService.getBalance().catch(e => ({ annual: { remaining: 0, total: 12 } })), // Fallback if fails
-        AttendanceService.getRecent(5).catch(e => []),
-        NotificationService.getAll({ limit: 3, unreadOnly: true }).catch(e => [])
-      ]);
+      if (!hasLoadedOnce) {
+        setLoading(true);
+        setIsLoading(true);
+      }
 
-      // Update Stats
-      setStats(prev => ({
-        ...prev,
-        leavesRemaining: balance.annual?.remaining || 0,
-        totalLeaves: balance.annual?.total || 12,
-      }));
+      // Start independent fetches
+      LeaveService.getBalance()
+        .then(balance => {
+          setStats(prev => ({
+            ...prev,
+            leavesRemaining: balance.annual?.remaining || 0,
+            totalLeaves: balance.annual?.total || 12,
+          }));
+        })
+        .catch(e => console.log('Leave balance error', e));
+
+      NotificationService.getUnreadCount()
+        .then(unreadData => {
+          if (unreadData && typeof unreadData.count === 'number') {
+            setUnreadCount(unreadData.count);
+          }
+        })
+        .catch(e => console.log('Unread count error', e));
+
+      NotificationService.getAll({ limit: 3, unreadOnly: true })
+        .then(notificationsData => {
+          if (notificationsData && Array.isArray(notificationsData.notifications)) {
+            const mappedNotifications = notificationsData.notifications.map((item: any) => {
+              const createdDate = item.createdAt ? new Date(item.createdAt) : new Date();
+              return {
+                id: item._id,
+                type: item.type,
+                title: item.title,
+                message: item.message,
+                time: !isNaN(createdDate.getTime()) ? createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
+                unread: !item.isRead,
+                icon: item.type === 'approved' ? 'check_circle' :
+                  item.type === 'rejected' ? 'cancel' :
+                    item.type === 'reminder' ? 'alarm' : 'info',
+              };
+            });
+            setNotifications(mappedNotifications);
+          }
+        })
+        .catch(e => console.log('Notifications error', e));
+
+      const recentAttendance = await AttendanceService.getRecent(5).catch(e => []);
 
       // Determine check-in status from today's latest attendance
       if (Array.isArray(recentAttendance) && recentAttendance.length > 0) {
@@ -85,34 +120,23 @@ export default function DashboardScreen() {
       }
 
       // Update Activities
-      const mappedActivities = recentAttendance.map((item: any) => ({
-        id: item._id,
-        type: item.checkOutTime ? 'check-out' : 'check-in',
-        time: item.checkOutTime
-          ? new Date(item.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : new Date(item.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        date: new Date(item.checkInTime).toLocaleDateString(),
-        status: item.status === 'LATE' ? 'warning' : 'success',
-        title: item.checkOutTime ? 'Check-out' : 'Check-in thành công',
-        subtitle: item.checkOutTime ? 'Hoàn thành ca làm việc' : 'Bắt đầu ca làm việc',
-      }));
-      setActivities(mappedActivities);
+      const mappedActivities = (Array.isArray(recentAttendance) ? recentAttendance : []).map((item: any) => {
+        const outDate = item.checkOutTime ? new Date(item.checkOutTime) : null;
+        const inDate = item.checkInTime ? new Date(item.checkInTime) : new Date();
 
-      // Update Notifications
-      if (Array.isArray(notificationsData)) {
-        const mappedNotifications = notificationsData.map((item: any) => ({
+        return {
           id: item._id,
-          type: item.type,
-          title: item.title,
-          message: item.message,
-          time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          unread: !item.isRead,
-          icon: item.type === 'approved' ? 'check_circle' :
-            item.type === 'rejected' ? 'cancel' :
-              item.type === 'reminder' ? 'alarm' : 'info',
-        }));
-        setNotifications(mappedNotifications);
-      }
+          type: item.checkOutTime ? 'check-out' : 'check-in',
+          time: item.checkOutTime && outDate && !isNaN(outDate.getTime())
+            ? outDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : (!isNaN(inDate.getTime()) ? inDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'),
+          date: !isNaN(inDate.getTime()) ? inDate.toLocaleDateString() : '--/--/----',
+          status: item.status === 'LATE' ? 'warning' : 'success',
+          title: item.checkOutTime ? 'Check-out' : 'Check-in thành công',
+          subtitle: item.checkOutTime ? 'Hoàn thành ca làm việc' : 'Bắt đầu ca làm việc',
+        };
+      });
+      setActivities(mappedActivities);
 
     } catch (error) {
       console.log('Error fetching dashboard data', error);
@@ -159,8 +183,6 @@ export default function DashboardScreen() {
   const userName = user?.name;
   const userAvatar = user?.avatar;
 
-  const unreadCount = notifications.filter(n => n.unread).length;
-
   const greeting = getGreeting();
 
 
@@ -178,18 +200,20 @@ export default function DashboardScreen() {
       if (!notificationsEnabled) return;
       console.log('[Dashboard] New notification via socket:', data.title);
       // Add to notifications list
+      const createdDate = data.createdAt ? new Date(data.createdAt) : new Date();
       const mapped = {
         id: data._id,
         type: data.type,
         title: data.title,
         message: data.message,
-        time: new Date(data.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: !isNaN(createdDate.getTime()) ? createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
         unread: !data.isRead,
         icon: data.type === 'approved' || data.type === 'request_approved' ? 'check_circle' :
           data.type === 'rejected' || data.type === 'request_rejected' ? 'cancel' :
             data.type === 'reminder' ? 'alarm' : 'info',
       };
       setNotifications(prev => [mapped, ...prev].slice(0, 5));
+      setUnreadCount(prev => prev + 1);
     };
 
     const handleAttendanceUpdate = () => {
@@ -302,7 +326,7 @@ export default function DashboardScreen() {
                       }}
                     >
                       <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '600' }}>
-                        {userName.charAt(0).toUpperCase()}
+                        {userName?.charAt(0)?.toUpperCase() || 'U'}
                       </Text>
                     </View>
                   )}

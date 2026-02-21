@@ -268,7 +268,10 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('vi-VN', {
+    if (!dateStr) return '--/--/----';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '--/--/----';
+    return d.toLocaleDateString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -276,6 +279,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
   };
 
   const formatDateForInput = (date: Date) => {
+    if (!date || isNaN(date.getTime())) return new Date().toISOString().split('T')[0];
     return date.toISOString().split('T')[0];
   };
 

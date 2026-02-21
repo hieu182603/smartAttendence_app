@@ -32,7 +32,7 @@ export const LoginScreen = () => {
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Smart Attendance</Text>
+                    <Text style={styles.title}>Smatt</Text>
                     <Text style={styles.subtitle}>Sign in to continue</Text>
                 </View>
 

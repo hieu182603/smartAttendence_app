@@ -30,16 +30,16 @@ export function useNotifications(): UseNotificationsReturn {
       const { NotificationService } = await import('../services/notification.service');
       const data = await NotificationService.getAll();
 
-      if (Array.isArray(data)) {
-        setNotifications(data.map((item: any) => ({
-          id: item._id,
+      if (data && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications.map((item: any) => ({
+          id: item._id || item.id,
           type: item.type,
           title: item.title,
           message: item.message,
           time: new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           timestamp: new Date(item.createdAt).getTime(),
-          icon: item.type === 'approved' || item.type === 'success' ? '✅' : item.type === 'rejected' || item.type === 'error' ? '❌' : item.type === 'warning' ? '⚠️' : 'ℹ️',
-          unread: !item.readAt,
+          icon: item.type === 'approved' || item.type === 'success' || item.type === 'request_approved' ? '✅' : item.type === 'rejected' || item.type === 'error' || item.type === 'request_rejected' ? '❌' : item.type === 'warning' || item.type === 'reminder' ? '⚠️' : 'ℹ️',
+          unread: !item.isRead,
         })));
       }
     } catch (err) {

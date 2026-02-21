@@ -24,25 +24,29 @@ export default function NotificationsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const mapNotification = (item: any): Notification => ({
-    id: item._id,
-    type: item.type,
-    title: item.title,
-    message: item.message,
-    time: new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    timestamp: new Date(item.createdAt).getTime(),
-    unread: !item.isRead,
-    icon: item.type === 'approved' || item.type === 'request_approved' ? 'check_circle' :
-      item.type === 'rejected' || item.type === 'request_rejected' ? 'cancel' :
-        item.type === 'reminder' ? 'alarm' : 'info',
-  });
+  const mapNotification = (item: any): Notification => {
+    const createdDate = item.createdAt ? new Date(item.createdAt) : new Date();
+    const isValid = !isNaN(createdDate.getTime());
+    return {
+      id: item._id,
+      type: item.type,
+      title: item.title,
+      message: item.message,
+      time: isValid ? createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
+      timestamp: isValid ? createdDate.getTime() : 0,
+      unread: !item.isRead,
+      icon: item.type === 'approved' || item.type === 'request_approved' ? 'check_circle' :
+        item.type === 'rejected' || item.type === 'request_rejected' ? 'cancel' :
+          item.type === 'reminder' ? 'alarm' : 'info',
+    };
+  };
 
   const fetchNotifications = async () => {
     try {
       const { NotificationService } = await import('../services/notification.service');
       const data = await NotificationService.getAll({ limit: 20 });
-      if (Array.isArray(data)) {
-        setNotifications(data.map(mapNotification));
+      if (data && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications.map(mapNotification));
       }
     } catch (error) {
       console.log('Error fetching notifications', error);
@@ -97,6 +101,16 @@ export default function NotificationsScreen() {
       setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
     } catch (error) {
       console.log('Error marking all as read', error);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      const { NotificationService } = await import('../services/notification.service');
+      await NotificationService.delete(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (error) {
+      console.log('Error deleting notification', error);
     }
   };
 
@@ -158,6 +172,7 @@ export default function NotificationsScreen() {
       </LinearGradient>
 
       <ScrollView
+        style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={
@@ -218,19 +233,24 @@ export default function NotificationsScreen() {
                       {item.message}
                     </Text>
                   </View>
-                  {item.unread && (
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: COLORS.accent.red,
-                        position: 'absolute',
-                        top: SPACING.md,
-                        right: SPACING.md,
+
+                  <View style={{ flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', marginLeft: SPACING.sm }}>
+                    {item.unread ? (
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.accent.red }} />
+                    ) : (
+                      <View style={{ height: 8 }} />
+                    )}
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation(); // Try to stop bubbling if supported
+                        deleteNotification(item.id);
                       }}
-                    />
-                  )}
+                      style={{ padding: 8, marginTop: 4, zIndex: 10 }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Icon name="delete" size={18} color={COLORS.text.secondary} />
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               );
             })
