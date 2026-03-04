@@ -14,7 +14,10 @@ import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { EmptyState } from '../../components/EmptyState';
-import { useTeam } from '../../hooks/useTeam';
+import { useTeamMembers } from '../../hooks/useManagerQueries';
+import { useQuery } from '@tanstack/react-query';
+import { ManagerService } from '../../services/manager.service';
+import { TeamMember } from '../../types';
 
 type ManagerScheduleScreenNavigationProp = DrawerNavigationProp<
   ManagerDrawerParamList,
@@ -32,7 +35,22 @@ const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 export default function ManagerScheduleScreen({ navigation }: ManagerScheduleScreenProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { members, isLoading, onlineCount, onLeaveCount } = useTeam();
+
+  // TanStack Query hooks
+  const { data: teamData, isLoading } = useTeamMembers();
+  const members: TeamMember[] = (teamData as TeamMember[]) ?? [];
+  const onlineCount = members.filter((m: TeamMember) => m.status === 'online').length;
+  const onLeaveCount = members.filter((m: TeamMember) => m.status === 'on-leave').length;
+
+  const month = currentDate.getMonth() + 1;
+  const year = currentDate.getFullYear();
+
+  const { data: scheduleData, isLoading: loadingSchedule } = useQuery({
+    queryKey: ['manager', 'departmentSchedule', month, year],
+    queryFn: () => ManagerService.getDepartmentSchedule(month, year),
+  });
+
+  const schedules: any[] = Array.isArray(scheduleData) ? scheduleData : [];
 
   // Get current month info
   const monthName = currentDate.toLocaleDateString('vi-VN', {
@@ -42,10 +60,10 @@ export default function ManagerScheduleScreen({ navigation }: ManagerScheduleScr
 
   // Get days in current month
   const daysInMonth = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+    const y = currentDate.getFullYear();
+    const m = currentDate.getMonth();
+    const firstDay = new Date(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0);
     const days: (Date | null)[] = [];
 
     // Add empty cells for days before month starts
@@ -56,7 +74,7 @@ export default function ManagerScheduleScreen({ navigation }: ManagerScheduleScr
 
     // Add all days in month
     for (let i = 1; i <= lastDay.getDate(); i++) {
-      days.push(new Date(year, month, i));
+      days.push(new Date(y, m, i));
     }
 
     return days;
@@ -87,39 +105,10 @@ export default function ManagerScheduleScreen({ navigation }: ManagerScheduleScr
     return day === 0 || day === 6;
   };
 
-  const [schedules, setSchedules] = useState<any[]>([]);
-  const [loadingSchedule, setLoadingSchedule] = useState(false);
-
-  React.useEffect(() => {
-    fetchSchedule();
-  }, [currentDate]);
-
-  const fetchSchedule = async () => {
-    try {
-      setLoadingSchedule(true);
-      const { ManagerService } = await import('../../services/manager.service');
-      const data = await ManagerService.getDepartmentSchedule(
-        currentDate.getMonth() + 1,
-        currentDate.getFullYear()
-      );
-      if (Array.isArray(data)) {
-        setSchedules(data);
-      }
-    } catch (error) {
-      console.log('Error fetching schedule', error);
-    } finally {
-      setLoadingSchedule(false);
-    }
-  };
-
   const hasShift = (date: Date | null, memberId: string) => {
     if (!date) return false;
     const dateStr = date.toISOString().split('T')[0];
-    // Check if member has shift on this date in schedules
-    // Assuming schedule structure: { memberId: string, shifts: { date: string, shiftId: string }[] }
-    // Or flat structure: { memberId, date, shiftId }
-    // For now, let's assume simple array of { memberId, date }
-    return schedules.some(s =>
+    return schedules.some((s: any) =>
       s.memberId === memberId &&
       new Date(s.date).toISOString().split('T')[0] === dateStr
     );

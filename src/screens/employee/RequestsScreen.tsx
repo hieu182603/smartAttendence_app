@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,19 @@ import {
   TextInput,
   Modal,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import { EmployeeTabParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../../utils/styles';
 import { useTranslation } from '../../i18n';
 import { Icon } from '../../components/Icon';
 import { DateTimePickerWrapper } from '../../components/DateTimePickerWrapper';
+import { useLeaveBalance, useLeaveHistory, useCreateLeaveRequest } from '../../hooks/useLeaveQueries';
+import { queryKeys } from '../../hooks/queryKeys';
 
 type RequestsScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Requests'>;
 
@@ -37,6 +41,7 @@ interface LeaveRequest {
 export default function RequestsScreen({ navigation }: RequestsScreenProps) {
   const theme = useTheme();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [leaveType, setLeaveType] = useState('');
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -62,89 +67,64 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
     }, [navigation])
   );
 
-  // State for fetched data
-  const [leaveBalance, setLeaveBalance] = useState<any[]>([
-    { id: 'annual', name: 'Nghỉ phép năm', remaining: 0 },
-    { id: 'sick', name: 'Nghỉ ốm', remaining: 0 },
-    { id: 'unpaid', name: 'Nghỉ không lương', remaining: 0 },
-  ]);
-  const [requests, setRequests] = useState<LeaveRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // TanStack Query hooks
+  const { data: balanceData, isLoading: balanceLoading } = useLeaveBalance();
+  const { data: historyData, isLoading: historyLoading } = useLeaveHistory({ limit: 10 });
+  const createLeaveRequest = useCreateLeaveRequest();
+
+  const isLoading = balanceLoading || historyLoading;
+  const isSubmitting = createLeaveRequest.isPending;
+
+  // Derive leave balance from query data
+  const leaveBalance = useMemo(() => {
+    const defaultBalance = [
+      { id: 'annual', name: 'Nghỉ phép năm', remaining: 0 },
+      { id: 'sick', name: 'Nghỉ ốm', remaining: 0 },
+      { id: 'unpaid', name: 'Nghỉ không lương', remaining: 0 },
+    ];
+    if (!balanceData) return defaultBalance;
+    if (Array.isArray(balanceData) && balanceData.length > 0) return balanceData;
+    if (typeof balanceData === 'object') {
+      const mapped: any[] = [];
+      if ((balanceData as any).annual) mapped.push({ id: 'annual', name: 'Nghỉ phép năm', remaining: (balanceData as any).annual.remaining || 0 });
+      if ((balanceData as any).sick) mapped.push({ id: 'sick', name: 'Nghỉ ốm', remaining: (balanceData as any).sick.remaining || 0 });
+      if ((balanceData as any).unpaid) mapped.push({ id: 'unpaid', name: 'Nghỉ không lương', remaining: (balanceData as any).unpaid.remaining || 0 });
+      return mapped.length > 0 ? mapped : defaultBalance;
+    }
+    return defaultBalance;
+  }, [balanceData]);
+
+  // Derive request list from query data
+  const requests: LeaveRequest[] = useMemo(() => {
+    if (!historyData || !Array.isArray(historyData)) return [];
+    return historyData.map((item: any) => ({
+      id: item._id,
+      type: item.type,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      reason: item.reason,
+      status: item.status,
+      submittedDate: item.submittedAt || item.createdAt || Date.now(),
+      rejectionReason: item.rejectionReason,
+    }));
+  }, [historyData]);
 
   const leaveTypes = [
-    t.requests.leaveTypes.annual,
-    t.requests.leaveTypes.sick,
-    t.requests.leaveTypes.unpaid,
-    t.requests.leaveTypes.overtime,
-    t.requests.leaveTypes.compensatory,
-    t.requests.leaveTypes.maternity,
+    { id: 'annual', label: t.requests.leaveTypes.annual },
+    { id: 'sick', label: t.requests.leaveTypes.sick },
+    { id: 'unpaid', label: t.requests.leaveTypes.unpaid },
+    { id: 'other', label: t.requests.leaveTypes.overtime },
+    { id: 'compensatory', label: t.requests.leaveTypes.compensatory },
+    { id: 'maternity', label: t.requests.leaveTypes.maternity },
   ];
 
-  // Map Vietnamese labels to canonical API codes
-  const mapLeaveTypeToCode = (label: string): string => {
-    const mapping: Record<string, string> = {
-      'Nghỉ phép năm': 'annual',
-      'Nghỉ ốm': 'sick',
-      'Nghỉ không lương': 'unpaid',
-      'Đăng ký tăng ca': 'other',
-      'Nghỉ bù': 'compensatory',
-      'Nghỉ thai sản': 'maternity'
-    };
-    return mapping[label] || 'other';
+  const getLeaveTypeLabel = (typeId: string) => {
+    const found = leaveTypes.find(t => t.id === typeId);
+    return found ? found.label : typeId;
   };
 
-  useEffect(() => {
-    fetchLeaveData();
-  }, []);
-
-  const fetchLeaveData = async () => {
-    try {
-      setIsLoading(true);
-      const { LeaveService } = await import('../../services/leave.service');
-
-      // Parallel fetching
-      const [balanceRes, historyRes] = await Promise.all([
-        LeaveService.getBalance(),
-        LeaveService.getHistory({ limit: 10 })
-      ]);
-
-      console.log('Balance Response:', balanceRes);
-
-      // Map Balance
-      if (Array.isArray(balanceRes) && balanceRes.length > 0) {
-        setLeaveBalance(balanceRes);
-      } else if (balanceRes && typeof balanceRes === 'object') {
-        // Fallback if backend returns object with keys
-        // This handles potential transition period or API format change
-        const mapped = [];
-        if (balanceRes.annual) mapped.push({ id: 'annual', name: 'Nghỉ phép năm', remaining: balanceRes.annual.remaining || 0 });
-        if (balanceRes.sick) mapped.push({ id: 'sick', name: 'Nghỉ ốm', remaining: balanceRes.sick.remaining || 0 });
-        if (balanceRes.unpaid) mapped.push({ id: 'unpaid', name: 'Nghỉ không lương', remaining: balanceRes.unpaid.remaining || 0 });
-
-        if (mapped.length > 0) setLeaveBalance(mapped);
-      }
-
-      // Map History
-      if (historyRes && Array.isArray(historyRes)) {
-        const mappedRequests = historyRes.map((item: any) => ({
-          id: item._id, // Use string ID from DB
-          type: item.type,
-          startDate: item.startDate,
-          endDate: item.endDate,
-          reason: item.reason,
-          status: item.status,
-          submittedDate: item.createdAt,
-          rejectionReason: item.rejectionReason,
-        }));
-        setRequests(mappedRequests);
-      }
-
-    } catch (error) {
-      console.error('Error fetching leave data', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.leave.all });
   };
 
   const handleSubmitRequest = async () => {
@@ -153,32 +133,25 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      const { LeaveService } = await import('../../services/leave.service');
-
-      // Map Vietnamese label to canonical code for backend
-      const canonicalType = mapLeaveTypeToCode(leaveType);
-
-      await LeaveService.createRequest({
-        type: canonicalType,
+    createLeaveRequest.mutate(
+      {
+        type: leaveType,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         reason: reason,
-      });
-
-      alert(t.requests.submitSuccess);
-      setIsDialogOpen(false);
-      setLeaveType('');
-      setReason('');
-      fetchLeaveData(); // Refresh list
-
-    } catch (error: any) {
-      console.error('Submit leave error', error);
-      alert(error.response?.data?.message || t.requests.submitError);
-    } finally {
-      setIsSubmitting(false);
-    }
+      },
+      {
+        onSuccess: () => {
+          alert(t.requests.submitSuccess);
+          setIsDialogOpen(false);
+          setLeaveType('');
+          setReason('');
+        },
+        onError: (error: any) => {
+          alert(error.response?.data?.message || t.requests.submitError);
+        },
+      }
+    );
   };
 
   const getStatusBadge = (status: string) => {
@@ -267,7 +240,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
     }
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | number) => {
     if (!dateStr) return '--/--/----';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return '--/--/----';
@@ -279,8 +252,9 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
   };
 
   const formatDateForInput = (date: Date) => {
-    if (!date || isNaN(date.getTime())) return new Date().toISOString().split('T')[0];
-    return date.toISOString().split('T')[0];
+    const d = (!date || isNaN(date.getTime())) ? new Date() : date;
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().split('T')[0];
   };
 
   return (
@@ -288,6 +262,14 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
       style={[globalStyles.container, { backgroundColor: theme.background }]}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 100 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={isLoading}
+          onRefresh={handleRefresh}
+          colors={[COLORS.primary]}
+          tintColor={COLORS.primary}
+        />
+      }
     >
       {/* Header */}
       <LinearGradient
@@ -472,7 +454,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                       marginBottom: SPACING.xs / 2,
                     }}
                   >
-                    {request.type}
+                    {getLeaveTypeLabel(request.type)}
                   </Text>
                   <Text style={{ fontSize: 11, color: theme.text.secondary }}>
                     {t.requests.submittedOn} {formatDate(request.submittedDate)}
@@ -645,7 +627,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                       fontSize: 16,
                     }}
                   >
-                    {leaveType || t.requests.selectType}
+                    {leaveType ? getLeaveTypeLabel(leaveType) : t.requests.selectType}
                   </Text>
                   <Icon name="chevron_right" size={20} color={COLORS.text.secondary} />
                 </TouchableOpacity>
@@ -677,11 +659,11 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                       }}
                       onStartShouldSetResponder={() => true}
                     >
-                      {leaveTypes.map((type) => (
+                      {leaveTypes.map((typeObj) => (
                         <TouchableOpacity
-                          key={type}
+                          key={typeObj.id}
                           onPress={() => {
-                            setLeaveType(type);
+                            setLeaveType(typeObj.id);
                             setShowLeaveTypePicker(false);
                           }}
                           style={{
@@ -689,7 +671,7 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                             borderRadius: BORDER_RADIUS.md,
                             marginBottom: SPACING.xs,
                             backgroundColor:
-                              leaveType === type
+                              leaveType === typeObj.id
                                 ? 'rgba(66, 69, 240, 0.1)'
                                 : 'transparent',
                           }}
@@ -697,14 +679,14 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
                           <Text
                             style={{
                               color:
-                                leaveType === type
+                                leaveType === typeObj.id
                                   ? COLORS.primary
                                   : theme.text.primary,
                               fontSize: 16,
-                              fontWeight: leaveType === type ? '600' : '400',
+                              fontWeight: leaveType === typeObj.id ? '600' : '400',
                             }}
                           >
-                            {type}
+                            {typeObj.label}
                           </Text>
                         </TouchableOpacity>
                       ))}

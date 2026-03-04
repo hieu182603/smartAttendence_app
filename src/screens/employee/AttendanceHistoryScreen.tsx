@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     ScrollView,
+    RefreshControl,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,7 +14,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
-import { AttendanceService } from '../../services/attendance.service';
+import { useAttendanceHistory } from '../../hooks/useAttendanceQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/queryKeys';
 
 type AttendanceHistoryScreenNavigationProp = StackNavigationProp<RootStackParamList, 'AttendanceHistory'>;
 
@@ -22,110 +25,114 @@ interface AttendanceHistoryScreenProps {
 }
 
 
-export default function AttendanceHistoryScreen({ navigation }: AttendanceHistoryScreenProps) {
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-    const [markedDates, setMarkedDates] = useState<any>({});
-    const [isLoading, setIsLoading] = useState(false);
-    const [monthlyStats, setMonthlyStats] = useState({
-        present: 0,
-        late: 0,
-        absent: 0,
-        totalHours: '0h',
-    });
-    const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().split('T')[0].substring(0, 7)); // YYYY-MM
-    const [dayDetails, setDayDetails] = useState<any>(null);
+const getLocalISODate = () => {
+    const d = new Date();
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().split('T')[0];
+};
 
-    useEffect(() => {
-        fetchAttendanceData(currentMonth);
+export default function AttendanceHistoryScreen({ navigation }: AttendanceHistoryScreenProps) {
+    const queryClient = useQueryClient();
+    const [selectedDate, setSelectedDate] = useState(getLocalISODate());
+    const [currentMonth, setCurrentMonth] = useState(getLocalISODate().substring(0, 7)); // YYYY-MM
+
+    // Build date range for the month
+    const dateRange = useMemo(() => {
+        const [year, monthNum] = currentMonth.split('-');
+        const from = `${year}-${monthNum}-01`;
+        const lastDay = new Date(parseInt(year), parseInt(monthNum), 0).getDate();
+        const to = `${year}-${monthNum}-${lastDay}`;
+        return { from, to };
     }, [currentMonth]);
 
-    useEffect(() => {
-        // Update details when selected date changes
-        if (markedDates[selectedDate]?.details) {
-            setDayDetails(markedDates[selectedDate].details);
-        } else {
-            setDayDetails(null);
-        }
-    }, [selectedDate, markedDates]);
+    // TanStack Query hook for attendance history
+    const { data: historyResponse, isLoading } = useAttendanceHistory({
+        from: dateRange.from,
+        to: dateRange.to,
+        limit: 100,
+    });
 
-    const fetchAttendanceData = async (month: string) => {
-        try {
-            setIsLoading(true);
-            // Construct date range for the month
-            const [year, monthNum] = month.split('-');
-            const from = `${year}-${monthNum}-01`;
-            const lastDay = new Date(parseInt(year), parseInt(monthNum), 0).getDate();
-            const to = `${year}-${monthNum}-${lastDay}`;
+    // Helper to parse duration string "Xh Ym"
+    const parseDuration = (str: string) => {
+        const h = str.match(/(\d+)h/)?.[1] || '0';
+        const m = str.match(/(\d+)m/)?.[1] || '0';
+        return parseInt(h) * 60 + parseInt(m);
+    };
 
-            // Call API
-            const response = await AttendanceService.getHistory({ from, to, limit: 100 });
-            const data = response.records || [];
+    // Derive markedDates and monthlyStats from query data
+    const { markedDates, monthlyStats } = useMemo(() => {
+        const data = (historyResponse as any)?.records || [];
+        const newMarkedDates: any = {};
+        let stats = { present: 0, late: 0, absent: 0, totalHours: 0 };
 
-            // Transform data for Calendar
-            const newMarkedDates: any = {};
-            let stats = { present: 0, late: 0, absent: 0, totalHours: 0 };
+        data.forEach((item: any) => {
+            let date = item.date;
 
-            // Helper to parse duration string "Xh Ym"
-            const parseDuration = (str: string) => {
-                const h = str.match(/(\d+)h/)?.[1] || '0';
-                const m = str.match(/(\d+)m/)?.[1] || '0';
-                return parseInt(h) * 60 + parseInt(m);
-            };
-
-            data.forEach((item: any) => {
-                const date = item.date; // Assuming API returns YYYY-MM-DD
-                let color = COLORS.accent.green;
-
-                // Map API status to UI colors
-                if (item.status === 'late') color = COLORS.accent.yellow;
-                if (item.status === 'absent' || item.status === 'on_leave') color = COLORS.accent.red;
-
-                newMarkedDates[date] = {
-                    selected: date === selectedDate,
-                    marked: true,
-                    dotColor: color,
-                    details: {
-                        status: item.status,
-                        checkIn: item.checkIn || '--:--',
-                        checkOut: item.checkOut || '--:--',
-                        total: item.hours || '0h 0m'
+            // Try Vietnamese date format fallback if standard ISO parse fails
+            if (date && !/^\d{4}-\d{2}-\d{2}/.test(date)) {
+                const dateRegex = /(\d{1,2})\s*(?:tháng|[/-])\s*(\d{1,2})(?:,\s*|\s+|[/-])\s*(\d{4})/;
+                const match = dateRegex.exec(date);
+                if (match) {
+                    const day = parseInt(match[1], 10);
+                    const mo = parseInt(match[2], 10);
+                    const yr = parseInt(match[3], 10);
+                    const d = new Date(yr, mo - 1, day);
+                    if (!isNaN(d.getTime())) {
+                        const offset = d.getTimezoneOffset() * 60000;
+                        date = new Date(d.getTime() - offset).toISOString().split('T')[0];
                     }
-                };
-
-                if (item.status === 'present') stats.present++;
-                if (item.status === 'late') stats.late++;
-                if (item.status === 'absent' || item.status === 'on_leave') stats.absent++;
-
-                // Accumulate total minutes
-                if (item.hours) {
-                    stats.totalHours += parseDuration(item.hours);
                 }
-            });
-
-            // Ensure marked dates include current selection
-            if (!newMarkedDates[selectedDate]) {
-                newMarkedDates[selectedDate] = { selected: true };
             }
 
-            // Format total hours back to string
-            const totalH = Math.floor(stats.totalHours / 60);
-            const totalM = stats.totalHours % 60;
-            const totalHoursStr = `${totalH}h ${totalM}m`;
+            let color = COLORS.accent.green;
+            if (item.status === 'late') color = COLORS.accent.yellow;
+            if (item.status === 'absent' || item.status === 'on_leave') color = COLORS.accent.red;
 
-            setMarkedDates(newMarkedDates);
-            setMonthlyStats({
+            newMarkedDates[date] = {
+                selected: date === selectedDate,
+                marked: true,
+                dotColor: color,
+                details: {
+                    status: item.status,
+                    checkIn: item.checkIn || '--:--',
+                    checkOut: item.checkOut || '--:--',
+                    total: item.hours || '0h 0m'
+                }
+            };
+
+            if (item.status === 'present') stats.present++;
+            if (item.status === 'late') stats.late++;
+            if (item.status === 'absent' || item.status === 'on_leave') stats.absent++;
+
+            if (item.hours) {
+                stats.totalHours += parseDuration(item.hours);
+            }
+        });
+
+        // Ensure marked dates include current selection
+        if (!newMarkedDates[selectedDate]) {
+            newMarkedDates[selectedDate] = { selected: true };
+        }
+
+        const totalH = Math.floor(stats.totalHours / 60);
+        const totalM = stats.totalHours % 60;
+        const totalHoursStr = `${totalH}h ${totalM}m`;
+
+        return {
+            markedDates: newMarkedDates,
+            monthlyStats: {
                 present: stats.present,
                 late: stats.late,
                 absent: stats.absent,
-                totalHours: totalHoursStr
-            });
+                totalHours: totalHoursStr,
+            },
+        };
+    }, [historyResponse, selectedDate]);
 
-        } catch (error) {
-            console.error('Error fetching attendance history:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // Derive day details from markedDates
+    const dayDetails = useMemo(() => {
+        return markedDates[selectedDate]?.details || null;
+    }, [selectedDate, markedDates]);
 
     const onMonthChange = (date: DateData) => {
         const newMonth = `${date.year}-${String(date.month).padStart(2, '0')}`;
@@ -176,7 +183,17 @@ export default function AttendanceHistoryScreen({ navigation }: AttendanceHistor
                 </View>
             </LinearGradient>
 
-            <ScrollView contentContainerStyle={{ paddingBottom: SPACING.xxl }}>
+            <ScrollView
+                contentContainerStyle={{ paddingBottom: SPACING.xxl }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isLoading}
+                        onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all })}
+                        colors={[COLORS.primary]}
+                        tintColor={COLORS.primary}
+                    />
+                }
+            >
                 {/* Calendar Section */}
                 <View style={{
                     margin: SPACING.md,
@@ -189,19 +206,6 @@ export default function AttendanceHistoryScreen({ navigation }: AttendanceHistor
                         current={currentMonth}
                         onDayPress={(day: DateData) => {
                             setSelectedDate(day.dateString);
-                            // Update selection styling
-                            const updatedMarked = { ...markedDates };
-                            // Unselect old
-                            Object.keys(updatedMarked).forEach(key => {
-                                if (updatedMarked[key].selected) updatedMarked[key].selected = false;
-                            });
-                            // Select new
-                            if (updatedMarked[day.dateString]) {
-                                updatedMarked[day.dateString].selected = true;
-                            } else {
-                                updatedMarked[day.dateString] = { selected: true };
-                            }
-                            setMarkedDates(updatedMarked);
                         }}
                         onMonthChange={onMonthChange}
                         markedDates={markedDates}

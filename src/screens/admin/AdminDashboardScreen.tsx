@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { AdminDrawerParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
-import { AdminService } from '../../services/admin.service';
+import { useAdminStats } from '../../hooks/useAdminQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/queryKeys';
 
 type AdminDashboardScreenNavigationProp = DrawerNavigationProp<AdminDrawerParamList, 'AdminDashboard'>;
 
@@ -26,43 +28,35 @@ interface DashboardStats {
 const { width } = Dimensions.get('window');
 
 export default function AdminDashboardScreen({ navigation }: AdminDashboardScreenProps) {
+  const queryClient = useQueryClient();
   const [now, setNow] = useState(new Date());
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchStats = async () => {
-    try {
-      setIsLoading(true);
-      const data = await AdminService.getDashboardStats();
-      setStats(data);
-    } catch (error) {
-      console.log('Error fetching dashboard stats', error);
-      // Fallback to defaults if API fails
-      setStats({
-        totalUsers: 0,
-        activeUsers: 0,
-        uptime: '99.9%',
-        serverStatus: 'Healthy',
-        cpuUsage: '0%',
-        memoryUsage: '0%',
-        storageUsage: '0%'
-      });
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
+  // TanStack Query hook
+  const { data: statsData, isLoading } = useAdminStats();
+
+  // Derive stats with fallback defaults
+  const stats = useMemo<DashboardStats>(() => {
+    if (statsData) return statsData as DashboardStats;
+    return {
+      totalUsers: 0,
+      activeUsers: 0,
+      uptime: '99.9%',
+      serverStatus: 'Healthy',
+      cpuUsage: '0%',
+      memoryUsage: '0%',
+      storageUsage: '0%',
+    };
+  }, [statsData]);
 
   useEffect(() => {
-    fetchStats();
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchStats();
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats() }).finally(() => setRefreshing(false));
   };
 
   const hours = now.getHours().toString().padStart(2, '0');

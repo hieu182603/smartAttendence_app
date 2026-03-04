@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,8 +14,11 @@ import { EmployeeTabParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../../utils/styles';
 import { useTranslation } from '../../i18n';
 import { Icon } from '../../components/Icon';
-import { ShiftService, EmployeeSchedule } from '../../services/shift.service';
-import { AttendanceService } from '../../services/attendance.service';
+import { EmployeeSchedule } from '../../services/shift.service';
+import { useShiftSchedule } from '../../hooks/useShiftQueries';
+import { useAttendanceHistory } from '../../hooks/useAttendanceQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/queryKeys';
 
 type ScheduleScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Schedule'>;
 
@@ -30,16 +33,14 @@ const TOTAL_HORIZONTAL_PADDING = SPACING_LG * 2;
 const CALENDAR_ITEM_SIZE = Math.floor((width - TOTAL_HORIZONTAL_PADDING - (GAP_SIZE * 6)) / 7) - 1;
 
 // Day status type matching the web version
-type DayStatus = 'completed' | 'today' | 'scheduled' | 'off' | 'none';
+type DayStatus = 'completed' | 'today' | 'scheduled' | 'off' | 'none' | 'late';
 
 export default function ScheduleScreen() {
   const theme = useTheme();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [scheduleMap, setScheduleMap] = useState<Record<string, EmployeeSchedule>>({});
-  const [attendanceMap, setAttendanceMap] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
 
   const formatDate = (date: Date) => {
     const year = date.getFullYear();
@@ -48,91 +49,86 @@ export default function ScheduleScreen() {
     return `${year}-${month}-${day}`;
   };
 
-  const fetchSchedule = async (date: Date) => {
-    try {
-      setLoading(true);
-      const year = date.getFullYear();
-      const month = date.getMonth();
+  // Compute date range for query
+  const dateRange = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const startDate = formatDate(new Date(year, month, 1));
+    const endDate = formatDate(new Date(year, month + 1, 0));
+    return { startDate, endDate };
+  }, [currentDate]);
 
-      // Build date range for the full month
-      const startDate = formatDate(new Date(year, month, 1));
-      const endDate = formatDate(new Date(year, month + 1, 0));
+  // TanStack Query hooks
+  const { data: scheduleData, isLoading: scheduleLoading } = useShiftSchedule(
+    dateRange.startDate,
+    dateRange.endDate
+  );
+  const { data: attendanceData, isLoading: attendanceLoading } = useAttendanceHistory(
+    { from: dateRange.startDate, to: dateRange.endDate, limit: 100 }
+  );
 
-      console.log(`[Schedule] Fetching: ${startDate} → ${endDate}`);
+  const loading = scheduleLoading || attendanceLoading;
 
-      // Fetch schedule and attendance in parallel
-      const [scheduleData, attendanceData] = await Promise.all([
-        ShiftService.getMySchedule(startDate, endDate),
-        AttendanceService.getHistory({ from: startDate, to: endDate, limit: 100 }).catch(() => ({ records: [] })),
-      ]);
+  // Build schedule map keyed by date
+  const scheduleMap = useMemo<Record<string, EmployeeSchedule>>(() => {
+    if (!scheduleData || !Array.isArray(scheduleData)) return {};
+    const map: Record<string, EmployeeSchedule> = {};
+    scheduleData.forEach((sched: EmployeeSchedule) => {
+      if (sched.date) {
+        const dateStr = sched.date.includes('T') ? sched.date.split('T')[0] : sched.date;
+        map[dateStr] = sched;
+      }
+    });
+    return map;
+  }, [scheduleData]);
 
-      console.log('[Schedule] Received:', scheduleData.length, 'schedules');
+  // Build attendance map keyed by date
+  const attendanceMap = useMemo<Record<string, any>>(() => {
+    const records = (attendanceData as any)?.records || (attendanceData as any)?.data || [];
+    if (!Array.isArray(records)) return {};
+    const map: Record<string, any> = {};
+    records.forEach((record: any) => {
+      if (record.date) {
+        const dateValue = String(record.date).trim();
+        let dateStr = '';
 
-      // Build schedule map keyed by date
-      const newScheduleMap: Record<string, EmployeeSchedule> = {};
-      scheduleData.forEach((sched: EmployeeSchedule) => {
-        if (sched.date) {
-          // Normalize to YYYY-MM-DD
-          const dateStr = sched.date.includes('T') ? sched.date.split('T')[0] : sched.date;
-          newScheduleMap[dateStr] = sched;
-        }
-      });
-
-      // Build attendance map keyed by date
-      const newAttendanceMap: Record<string, any> = {};
-      const records = attendanceData?.records || attendanceData?.data || [];
-      if (Array.isArray(records)) {
-        records.forEach((record: any) => {
-          if (record.date) {
-            const dateValue = String(record.date).trim();
-            let dateStr = '';
-
-            // ISO format
-            if (/^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
-              const d = new Date(dateValue);
-              if (!isNaN(d.getTime())) {
-                dateStr = d.toISOString().split('T')[0];
-              }
-            } else {
-              // Try Vietnamese date format
-              const dateRegex = /(\d{1,2})\s*(?:tháng|[/-])\s*(\d{1,2})(?:,\s*|\s+|[/-])\s*(\d{4})/;
-              const match = dateRegex.exec(dateValue);
-              if (match) {
-                const day = parseInt(match[1], 10);
-                const mo = parseInt(match[2], 10);
-                const yr = parseInt(match[3], 10);
-                const d = new Date(yr, mo - 1, day);
-                if (!isNaN(d.getTime())) {
-                  dateStr = d.toISOString().split('T')[0];
-                }
-              } else {
-                const d = new Date(dateValue);
-                if (!isNaN(d.getTime())) {
-                  dateStr = d.toISOString().split('T')[0];
-                }
-              }
+        if (/^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+          const d = new Date(dateValue);
+          if (!isNaN(d.getTime())) {
+            dateStr = d.toISOString().split('T')[0];
+          }
+        } else {
+          const dateRegex = /(\d{1,2})\s*(?:tháng|[/-])\s*(\d{1,2})(?:,\s*|\s+|[/-])\s*(\d{4})/;
+          const match = dateRegex.exec(dateValue);
+          if (match) {
+            const day = parseInt(match[1], 10);
+            const mo = parseInt(match[2], 10);
+            const yr = parseInt(match[3], 10);
+            const d = new Date(yr, mo - 1, day);
+            if (!isNaN(d.getTime())) {
+              dateStr = d.toISOString().split('T')[0];
             }
-
-            if (dateStr) {
-              newAttendanceMap[dateStr] = record;
+          } else {
+            const d = new Date(dateValue);
+            if (!isNaN(d.getTime())) {
+              dateStr = d.toISOString().split('T')[0];
             }
           }
-        });
-      }
+        }
 
-      setScheduleMap(newScheduleMap);
-      setAttendanceMap(newAttendanceMap);
-    } catch (error) {
-      console.log('[Schedule] Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (dateStr) {
+          map[dateStr] = record;
+        }
+      }
+    });
+    return map;
+  }, [attendanceData]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchSchedule(currentDate);
-    }, [currentDate])
+      queryClient.invalidateQueries({ queryKey: queryKeys.shift.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all });
+    }, [queryClient])
   );
 
   const getDaysInMonth = (date: Date) => {
@@ -198,6 +194,9 @@ export default function ScheduleScreen() {
 
     // Check attendance for this day
     if (attendance) {
+      if (attendance.status === 'absent' || attendance.status === 'weekend') return 'off';
+      if (attendance.status === 'LATE') return 'late';
+
       const checkIn = attendance.checkIn || attendance.check_in;
       const hasCheckIn = checkIn &&
         String(checkIn).trim() !== '' &&
@@ -206,8 +205,6 @@ export default function ScheduleScreen() {
         String(checkIn).trim() !== 'undefined';
 
       if (hasCheckIn) return 'completed';
-
-      if (attendance.status === 'absent' || attendance.status === 'weekend') return 'off';
     }
 
     // Today
@@ -240,6 +237,12 @@ export default function ScheduleScreen() {
           backgroundColor: COLORS.accent.green,
           textColor: '#ffffff',
           borderColor: COLORS.accent.green,
+        };
+      case 'late':
+        return {
+          backgroundColor: COLORS.accent.yellow,
+          textColor: '#ffffff',
+          borderColor: COLORS.accent.yellow,
         };
       case 'today':
         return {
@@ -275,6 +278,7 @@ export default function ScheduleScreen() {
   // Legend items matching the web version
   const legendItems = [
     { color: COLORS.accent.green, label: t.schedule.legend.completed },
+    { color: COLORS.accent.yellow, label: t.schedule.legend.late || 'Đi muộn' },
     { color: COLORS.accent.cyan, label: t.schedule.legend.today },
     { color: COLORS.primary, label: t.schedule.legend.scheduled },
     { color: 'rgba(148, 163, 184, 0.4)', label: t.schedule.legend.off },

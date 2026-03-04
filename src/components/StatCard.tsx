@@ -72,12 +72,14 @@ export const StatCard: React.FC<StatCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     backgroundColor: COLORS.surface.dark,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.05)',
     ...SHADOWS.md,
+    alignItems: 'center',
   },
   iconContainer: {
     width: 44,

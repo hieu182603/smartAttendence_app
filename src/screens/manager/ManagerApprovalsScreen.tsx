@@ -18,7 +18,7 @@ import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { EmptyState } from '../../components/EmptyState';
-import { useApprovals } from '../../hooks/useApprovals';
+import { useManagerApprovals, useApproveRequest, useRejectRequest } from '../../hooks/useManagerQueries';
 import { ApprovalRequest } from '../../types';
 
 type ManagerApprovalsScreenNavigationProp = DrawerNavigationProp<ManagerDrawerParamList, 'ManagerApprovals'>;
@@ -28,12 +28,21 @@ interface ManagerApprovalsScreenProps {
 }
 
 export default function ManagerApprovalsScreen({ navigation }: ManagerApprovalsScreenProps) {
-  const { approvals, isLoading, error, approve, reject, pendingCount } = useApprovals();
+  // TanStack Query hooks
+  const { data: approvalsData, isLoading, error: queryError } = useManagerApprovals();
+  const approveRequestMutation = useApproveRequest();
+  const rejectRequestMutation = useRejectRequest();
+
+  const approvals: ApprovalRequest[] = approvalsData ?? [];
+  const pendingCount = approvals.filter((a: ApprovalRequest) => a.status === 'pending').length;
+  const error = queryError ? (queryError as Error).message : '';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApproval, setSelectedApproval] = useState<ApprovalRequest | null>(null);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+
+  const isProcessing = approveRequestMutation.isPending || rejectRequestMutation.isPending;
 
   // Filter approvals based on search
   const filteredApprovals = useMemo(() => {
@@ -41,7 +50,7 @@ export default function ManagerApprovalsScreen({ navigation }: ManagerApprovalsS
 
     const query = searchQuery.toLowerCase();
     return approvals.filter(
-      approval =>
+      (approval: ApprovalRequest) =>
         approval.employeeName.toLowerCase().includes(query) ||
         approval.reason.toLowerCase().includes(query) ||
         approval.type.toLowerCase().includes(query)
@@ -49,46 +58,40 @@ export default function ManagerApprovalsScreen({ navigation }: ManagerApprovalsS
   }, [approvals, searchQuery]);
 
   // Get stats
-  const approvedCount = approvals.filter(a => a.status === 'approved').length;
-  const rejectedCount = approvals.filter(a => a.status === 'rejected').length;
+  const approvedCount = approvals.filter((a: ApprovalRequest) => a.status === 'approved').length;
+  const rejectedCount = approvals.filter((a: ApprovalRequest) => a.status === 'rejected').length;
 
   // Handle approve
   const handleApprove = useCallback(
-    async (approval: ApprovalRequest) => {
+    (approval: ApprovalRequest) => {
       if (isProcessing) return;
-
-      try {
-        setIsProcessing(true);
-        await approve(approval.id, 'Đã phê duyệt');
-        Alert.alert('Thành công', 'Đã duyệt đơn nghỉ phép thành công');
-      } catch (err) {
-        console.error('Failed to approve:', err);
-        Alert.alert('Lỗi', 'Không thể duyệt đơn. Vui lòng thử lại.');
-      } finally {
-        setIsProcessing(false);
-      }
+      approveRequestMutation.mutate(
+        { id: approval.id, note: 'Đã phê duyệt' },
+        {
+          onSuccess: () => Alert.alert('Thành công', 'Đã duyệt đơn nghỉ phép thành công'),
+          onError: () => Alert.alert('Lỗi', 'Không thể duyệt đơn. Vui lòng thử lại.'),
+        }
+      );
     },
-    [approve, isProcessing]
+    [approveRequestMutation, isProcessing]
   );
 
   // Handle reject
-  const handleReject = useCallback(async () => {
+  const handleReject = useCallback(() => {
     if (!selectedApproval || !rejectNote.trim() || isProcessing) return;
-
-    try {
-      setIsProcessing(true);
-      await reject(selectedApproval.id, rejectNote);
-      setShowRejectDialog(false);
-      setSelectedApproval(null);
-      setRejectNote('');
-      Alert.alert('Thành công', 'Đã từ chối đơn nghỉ phép');
-    } catch (err) {
-      console.error('Failed to reject:', err);
-      Alert.alert('Lỗi', 'Không thể từ chối đơn. Vui lòng thử lại.');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [reject, selectedApproval, rejectNote, isProcessing]);
+    rejectRequestMutation.mutate(
+      { id: selectedApproval.id, note: rejectNote },
+      {
+        onSuccess: () => {
+          setShowRejectDialog(false);
+          setSelectedApproval(null);
+          setRejectNote('');
+          Alert.alert('Thành công', 'Đã từ chối đơn nghỉ phép');
+        },
+        onError: () => Alert.alert('Lỗi', 'Không thể từ chối đơn. Vui lòng thử lại.'),
+      }
+    );
+  }, [rejectRequestMutation, selectedApproval, rejectNote, isProcessing]);
 
   // Open reject dialog
   const openRejectDialog = useCallback((approval: ApprovalRequest) => {

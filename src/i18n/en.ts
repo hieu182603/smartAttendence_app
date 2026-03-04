@@ -81,6 +81,7 @@ export const en: Translations = {
             today: 'Today',
             scheduled: 'Scheduled',
             off: 'Off / Weekend',
+            late: 'Late',
         },
         detail: {
             title: 'Shift Details',
@@ -93,6 +94,7 @@ export const en: Translations = {
             off: 'Off',
             missed: 'Missed',
             scheduled: 'Scheduled',
+            late: 'Late',
         },
         noShift: 'No shift scheduled for this day',
         daysOfWeek: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],

@@ -23,7 +23,10 @@ export enum Screen {
   AdminUsers = 'ADMIN_USERS',
   AdminReports = 'ADMIN_REPORTS',
   AdminSettings = 'ADMIN_SETTINGS',
-  AdminAudit = 'ADMIN_AUDIT'
+  AdminAudit = 'ADMIN_AUDIT',
+  // Common Screens
+  Settings = 'SETTINGS',
+  TeamReports = 'TEAM_REPORTS',
 }
 
 export interface Shift {

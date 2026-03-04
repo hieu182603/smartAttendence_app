@@ -2,14 +2,15 @@ import api from '../libs/axios';
 
 export const UserService = {
     getProfile: async () => {
-        const response = await api.get('/users/profile');
+        const response = await api.get('/users/me');
         return response.data;
     },
 
     updateProfile: async (data: { name?: string; phone?: string; email?: string; address?: string }) => {
-        const response = await api.put('/users/profile', data);
+        const response = await api.put('/users/me', data);
         return response.data;
     },
+
 
     updateBankInfo: async (data: { bankName: string; accountNumber: string }) => {
         const response = await api.put('/users/bank-info', data);

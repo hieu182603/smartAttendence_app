@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
@@ -6,11 +6,9 @@ import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { StatCard } from '../../components/StatCard';
-import { NotificationPanel } from '../../components/NotificationPanel';
 import { EmptyState } from '../../components/EmptyState';
-import { useNotifications } from '../../hooks/useNotifications';
-import { useApprovals } from '../../hooks/useApprovals';
-import { useTeam } from '../../hooks/useTeam';
+import { useUnreadCount } from '../../hooks/useNotificationQueries';
+import { useManagerApprovals, useTeamMembers } from '../../hooks/useManagerQueries';
 import { useAuth } from '../../context/AuthContext';
 import { ApprovalRequest } from '../../types';
 
@@ -25,60 +23,20 @@ const cardWidth = (width - SPACING.xl * 2 - SPACING.sm) / 2;
 
 export default function ManagerDashboardScreen({ navigation }: ManagerDashboardScreenProps) {
   const { user } = useAuth();
-  const [showNotifications, setShowNotifications] = useState(false);
 
-  const {
-    notifications,
-    unreadCount,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-  } = useNotifications();
+  // TanStack Query hooks
+  const { data: unreadData } = useUnreadCount();
+  const { data: approvalsData, isLoading: approvalsLoading } = useManagerApprovals();
+  const { data: teamData, isLoading: teamLoading } = useTeamMembers();
 
-  const {
-    approvals,
-    isLoading: approvalsLoading,
-    pendingCount,
-  } = useApprovals();
+  // Derive data from queries
+  const unreadCount = (unreadData as any)?.count ?? 0;
+  const approvals: ApprovalRequest[] = approvalsData ?? [];
+  const pendingCount = approvals.filter((a: ApprovalRequest) => a.status === 'pending').length;
+  const members = teamData ?? [];
+  const onlineCount = (members as any[]).filter((m: any) => m.status === 'online').length;
+  const onLeaveCount = (members as any[]).filter((m: any) => m.status === 'on-leave').length;
 
-  const {
-    members,
-    isLoading: teamLoading,
-    onlineCount,
-    onLeaveCount,
-  } = useTeam();
-
-  const handleMarkAsRead = useCallback(async (id: string) => {
-    try {
-      await markAsRead(id);
-    } catch (err) {
-      console.error('Failed to mark as read:', err);
-    }
-  }, [markAsRead]);
-
-  const handleMarkAllAsRead = useCallback(async () => {
-    try {
-      await markAllAsRead();
-    } catch (err) {
-      console.error('Failed to mark all as read:', err);
-    }
-  }, [markAllAsRead]);
-
-  const handleDeleteNotification = useCallback(async (id: string) => {
-    try {
-      await deleteNotification(id);
-    } catch (err) {
-      console.error('Failed to delete notification:', err);
-    }
-  }, [deleteNotification]);
-
-  const toggleNotifications = useCallback(() => {
-    setShowNotifications(prev => !prev);
-  }, []);
-
-  const closeNotifications = useCallback(() => {
-    setShowNotifications(false);
-  }, []);
 
   const getLeaveTypeLabel = (type: string) => {
     switch (type) {
@@ -130,7 +88,7 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
 
             {/* Notification Bell */}
             <TouchableOpacity
-              onPress={toggleNotifications}
+              onPress={() => navigation.navigate('Notifications' as any)}
               style={styles.notificationButton}
             >
               <Icon name="notifications" size={20} color="#ffffff" />
@@ -153,49 +111,43 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
           </View>
         </LinearGradient>
 
-        {/* Notification Panel */}
-        <NotificationPanel
-          notifications={notifications}
-          unreadCount={unreadCount}
-          isOpen={showNotifications}
-          onClose={closeNotifications}
-          onMarkAsRead={handleMarkAsRead}
-          onMarkAllAsRead={handleMarkAllAsRead}
-          onDelete={handleDeleteNotification}
-        />
 
         {/* Main Content */}
         <View style={styles.content}>
           {/* Manager Stats - Orange Theme */}
           <View style={styles.statsGrid}>
-            <StatCard
-              icon="error"
-              title="Chờ duyệt"
-              value={approvalsLoading ? '...' : pendingCount}
-              unit="đơn nghỉ phép"
-              color="warning"
-            />
-            <StatCard
-              icon="groups"
-              title="Thành viên"
-              value={teamLoading ? '...' : members.length}
-              unit="nhân viên"
-              color="warning"
-            />
-            <StatCard
-              icon="person_check"
-              title="Đang làm việc"
-              value={teamLoading ? '...' : onlineCount}
-              unit="người trực tuyến"
-              color="success"
-            />
-            <StatCard
-              icon="event"
-              title="Đang nghỉ"
-              value={teamLoading ? '...' : onLeaveCount}
-              unit="nhân viên"
-              color="primary"
-            />
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="pending_actions"
+                title="Chờ duyệt"
+                value={approvalsLoading ? '...' : pendingCount}
+                unit="đơn nghỉ phép"
+                color="warning"
+              />
+              <StatCard
+                icon="groups"
+                title="Thành viên"
+                value={teamLoading ? '...' : (members as any[]).length}
+                unit="nhân viên"
+                color="warning"
+              />
+            </View>
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="how_to_reg"
+                title="Đang làm việc"
+                value={teamLoading ? '...' : onlineCount}
+                unit="người trực tuyến"
+                color="success"
+              />
+              <StatCard
+                icon="event_busy"
+                title="Đang nghỉ"
+                value={teamLoading ? '...' : onLeaveCount}
+                unit="nhân viên"
+                color="primary"
+              />
+            </View>
           </View>
 
           {/* Pending Approvals Section */}
@@ -301,7 +253,7 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
                 />
               ) : (
                 <View style={styles.membersList}>
-                  {members.map(member => (
+                  {(members as any[]).map((member: any) => (
                     <View key={member.id} style={styles.memberItem}>
                       <View style={styles.memberAvatarContainer}>
                         <View style={styles.memberAvatar}>
@@ -539,10 +491,12 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
   },
   statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: SPACING.sm,
     marginBottom: SPACING.xl,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
   },
   section: {
     marginBottom: SPACING.xl,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,19 +13,28 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { EmployeeTabParamList } from '../../navigation/AppNavigator';
+import { useQueryClient } from '@tanstack/react-query';
+import { EmployeeTabParamList, RootStackParamList } from '../../navigation/AppNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../../utils/styles';
 import { useTranslation } from '../../i18n';
 import { Icon } from '../../components/Icon';
-import { AttendanceService } from '../../services/attendance.service';
-import { LeaveService } from '../../services/leave.service';
-import { NotificationService } from '../../services/notification.service';
-import { AttendanceStats, Activity, Notification } from '../../types';
 import { useSocket } from '../../context/SocketContext';
 import { usePreferences } from '../../context/PreferencesContext';
 
-type DashboardScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Home'>;
+// TanStack Query hooks
+import { useLeaveBalance } from '../../hooks/useLeaveQueries';
+import { useRecentAttendance } from '../../hooks/useAttendanceQueries';
+import { useNotificationsList, useUnreadCount } from '../../hooks/useNotificationQueries';
+import { queryKeys } from '../../hooks/queryKeys';
+
+import { StackNavigationProp } from '@react-navigation/stack';
+import { CompositeNavigationProp } from '@react-navigation/native';
+
+type DashboardScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<EmployeeTabParamList, 'Home'>,
+  StackNavigationProp<RootStackParamList>
+>;
 
 interface DashboardScreenProps {
   navigation: DashboardScreenNavigationProp;
@@ -35,134 +44,117 @@ const { width } = Dimensions.get('window');
 
 export default function DashboardScreen() {
   const { user } = useAuth();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<DashboardScreenNavigationProp>();
   const theme = useTheme();
   const { t } = useTranslation();
   const { notificationsEnabled } = usePreferences();
+  const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  const [stats, setStats] = useState({
+  // ─── TanStack Query hooks ───────────────────────────────────────
+  const {
+    data: leaveBalance,
+    isLoading: isLeaveLoading,
+  } = useLeaveBalance();
+
+  const {
+    data: recentAttendance,
+    isLoading: isAttendanceLoading,
+    refetch: refetchAttendance,
+  } = useRecentAttendance(5);
+
+  const {
+    data: unreadData,
+    refetch: refetchUnread,
+  } = useUnreadCount();
+
+  const {
+    data: notificationsData,
+    refetch: refetchNotifications,
+  } = useNotificationsList({ limit: 3, unreadOnly: true });
+
+  const isLoading = isLeaveLoading && isAttendanceLoading;
+
+  // ─── Derived state from query data ──────────────────────────────
+  const stats = useMemo(() => ({
     attendanceLikelihood: 100,
-    leavesRemaining: 0,
-    totalLeaves: 12,
+    leavesRemaining: leaveBalance?.annual?.remaining || 0,
+    totalLeaves: leaveBalance?.annual?.total || 12,
     overtimeHours: 0,
     thisMonth: 0,
     totalDays: 0,
-  });
+  }), [leaveBalance]);
 
-  const [activities, setActivities] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const unreadCount = unreadData?.count ?? 0;
 
-  const fetchDashboardData = async () => {
-    try {
-      if (!hasLoadedOnce) {
-        setLoading(true);
-        setIsLoading(true);
-      }
+  const notifications = useMemo(() => {
+    if (!notificationsData?.notifications || !Array.isArray(notificationsData.notifications)) return [];
+    return notificationsData.notifications.map((item: any) => {
+      const createdDate = item.createdAt ? new Date(item.createdAt) : new Date();
+      return {
+        id: item._id,
+        type: item.type,
+        title: item.title,
+        message: item.message,
+        time: !isNaN(createdDate.getTime()) ? createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
+        unread: !item.isRead,
+        icon: item.type === 'approved' ? 'check_circle' :
+          item.type === 'rejected' ? 'cancel' :
+            item.type === 'reminder' ? 'alarm' : 'info',
+      };
+    });
+  }, [notificationsData]);
 
-      // Start independent fetches
-      LeaveService.getBalance()
-        .then(balance => {
-          setStats(prev => ({
-            ...prev,
-            leavesRemaining: balance.annual?.remaining || 0,
-            totalLeaves: balance.annual?.total || 12,
-          }));
-        })
-        .catch(e => console.log('Leave balance error', e));
+  const isCheckedIn = useMemo(() => {
+    if (!Array.isArray(recentAttendance) || recentAttendance.length === 0) return false;
+    // The most recent record is the first one (sorted by date desc)
+    const latest = recentAttendance[0] as any;
+    // API returns pre-formatted strings: checkIn = "08:30", checkOut = "17:30" or null
+    return !!latest && !!latest.checkIn && !latest.checkOut;
+  }, [recentAttendance]);
 
-      NotificationService.getUnreadCount()
-        .then(unreadData => {
-          if (unreadData && typeof unreadData.count === 'number') {
-            setUnreadCount(unreadData.count);
-          }
-        })
-        .catch(e => console.log('Unread count error', e));
+  const activities = useMemo(() => {
+    if (!Array.isArray(recentAttendance)) return [];
+    return recentAttendance.map((item: any) => {
+      // API from /attendance/recent returns:
+      // date: "Thứ ba, 2 tháng 3, 2026" (pre-formatted Vietnamese string)
+      // checkIn: "08:30" (pre-formatted time string or null)
+      // checkOut: "17:30" (pre-formatted time string or null)
+      // status: "present" | "late" | "absent"
+      const hasCheckOut = !!item.checkOut;
 
-      NotificationService.getAll({ limit: 3, unreadOnly: true })
-        .then(notificationsData => {
-          if (notificationsData && Array.isArray(notificationsData.notifications)) {
-            const mappedNotifications = notificationsData.notifications.map((item: any) => {
-              const createdDate = item.createdAt ? new Date(item.createdAt) : new Date();
-              return {
-                id: item._id,
-                type: item.type,
-                title: item.title,
-                message: item.message,
-                time: !isNaN(createdDate.getTime()) ? createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
-                unread: !item.isRead,
-                icon: item.type === 'approved' ? 'check_circle' :
-                  item.type === 'rejected' ? 'cancel' :
-                    item.type === 'reminder' ? 'alarm' : 'info',
-              };
-            });
-            setNotifications(mappedNotifications);
-          }
-        })
-        .catch(e => console.log('Notifications error', e));
+      return {
+        id: item._id || item.id || Math.random().toString(),
+        type: hasCheckOut ? 'check-out' : 'check-in',
+        time: hasCheckOut ? item.checkOut : (item.checkIn || '--:--'),
+        date: item.date || '--/--/----',
+        status: item.status === 'late' ? 'warning' : 'success',
+        title: hasCheckOut ? 'Check-out' : 'Check-in thành công',
+        subtitle: hasCheckOut ? 'Hoàn thành ca làm việc' : 'Bắt đầu ca làm việc',
+      };
+    });
+  }, [recentAttendance]);
 
-      const recentAttendance = await AttendanceService.getRecent(5).catch(e => []);
+  // ─── Pull-to-refresh ────────────────────────────────────────────
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      refetchAttendance(),
+      refetchUnread(),
+      refetchNotifications(),
+      queryClient.invalidateQueries({ queryKey: queryKeys.leave.balance() }),
+    ]);
+    setRefreshing(false);
+  }, [refetchAttendance, refetchUnread, refetchNotifications, queryClient]);
 
-      // Determine check-in status from today's latest attendance
-      if (Array.isArray(recentAttendance) && recentAttendance.length > 0) {
-        const today = new Date().toISOString().split('T')[0];
-        const todayRecord = recentAttendance.find((item: any) => {
-          const recordDate = new Date(item.checkInTime).toISOString().split('T')[0];
-          return recordDate === today;
-        });
-        // If there's a today record with checkIn but no checkOut, user is currently checked in
-        setIsCheckedIn(!!todayRecord && !!todayRecord.checkInTime && !todayRecord.checkOutTime);
-      }
-
-      // Update Activities
-      const mappedActivities = (Array.isArray(recentAttendance) ? recentAttendance : []).map((item: any) => {
-        const outDate = item.checkOutTime ? new Date(item.checkOutTime) : null;
-        const inDate = item.checkInTime ? new Date(item.checkInTime) : new Date();
-
-        return {
-          id: item._id,
-          type: item.checkOutTime ? 'check-out' : 'check-in',
-          time: item.checkOutTime && outDate && !isNaN(outDate.getTime())
-            ? outDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : (!isNaN(inDate.getTime()) ? inDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'),
-          date: !isNaN(inDate.getTime()) ? inDate.toLocaleDateString() : '--/--/----',
-          status: item.status === 'LATE' ? 'warning' : 'success',
-          title: item.checkOutTime ? 'Check-out' : 'Check-in thành công',
-          subtitle: item.checkOutTime ? 'Hoàn thành ca làm việc' : 'Bắt đầu ca làm việc',
-        };
-      });
-      setActivities(mappedActivities);
-
-    } catch (error) {
-      console.log('Error fetching dashboard data', error);
-    } finally {
-      setLoading(false);
-      setIsLoading(false);
-      setRefreshing(false);
-      setHasLoadedOnce(true);
-    }
-  };
-
-  // Only show full loading spinner on first load
-  // On subsequent tab switches, fetch silently in background
+  // ─── Refetch on tab focus ───────────────────────────────────────
   useFocusEffect(
     useCallback(() => {
-      if (!hasLoadedOnce) {
-        setIsLoading(true);
-      }
-      fetchDashboardData();
-    }, [hasLoadedOnce])
+      // Just invalidate to trigger background refetch; cached data shown instantly
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.recent(5) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.unreadCount() });
+    }, [queryClient])
   );
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchDashboardData();
-  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -182,43 +174,26 @@ export default function DashboardScreen() {
 
   const userName = user?.name;
   const userAvatar = user?.avatar;
-
   const greeting = getGreeting();
-
 
   // Check In/Out State
   const [isProcessing, setIsProcessing] = useState(false);
   const { socket } = useSocket();
 
-
-  // 🔴 Realtime: Listen for socket events
+  // 🔴 Realtime: Listen for socket events → invalidate query cache
   useEffect(() => {
     if (!socket) return;
 
     const handleNewNotification = (data: any) => {
-      // Suppress in-app notification if user disabled notifications
       if (!notificationsEnabled) return;
       console.log('[Dashboard] New notification via socket:', data.title);
-      // Add to notifications list
-      const createdDate = data.createdAt ? new Date(data.createdAt) : new Date();
-      const mapped = {
-        id: data._id,
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        time: !isNaN(createdDate.getTime()) ? createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
-        unread: !data.isRead,
-        icon: data.type === 'approved' || data.type === 'request_approved' ? 'check_circle' :
-          data.type === 'rejected' || data.type === 'request_rejected' ? 'cancel' :
-            data.type === 'reminder' ? 'alarm' : 'info',
-      };
-      setNotifications(prev => [mapped, ...prev].slice(0, 5));
-      setUnreadCount(prev => prev + 1);
+      // Invalidate queries so they refetch with new data
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
     };
 
     const handleAttendanceUpdate = () => {
-      // Re-fetch dashboard data when attendance is updated
-      fetchDashboardData();
+      // Invalidate attendance queries to trigger refetch
+      queryClient.invalidateQueries({ queryKey: queryKeys.attendance.all });
     };
 
     socket.on('notification', handleNewNotification);
@@ -228,14 +203,10 @@ export default function DashboardScreen() {
       socket.off('notification', handleNewNotification);
       socket.off('attendance-updated', handleAttendanceUpdate);
     };
-  }, [socket]);
+  }, [socket, notificationsEnabled, queryClient]);
 
   const handleCheckInOut = () => {
-    // Navigate to Attendance Screen for Face + Location Check
-    // We pass the mode (check-in if not currently checked in, check-out otherwise)
     const mode = isCheckedIn ? 'check-out' : 'check-in';
-
-    // @ts-ignore - Navigation type safety requires full typed hooks but for now ignore
     navigation.navigate('Attendance', { mode });
   };
 
@@ -248,6 +219,14 @@ export default function DashboardScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
       >
         {/* Header with Notification Bell */}
         <LinearGradient
@@ -601,7 +580,7 @@ export default function DashboardScreen() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: SPACING.xl }}>
                 {/* Attendance This Month */}
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('AttendanceHistory' as any)}
+                  onPress={() => navigation.navigate('AttendanceHistory')}
                   style={{
                     width: (width - SPACING.lg * 3) / 2,
                     backgroundColor: theme.cardBg,
@@ -732,6 +711,7 @@ export default function DashboardScreen() {
               ) : (
                 <View>
                   {activities.map((activity, index) => {
+
                     const statusColorMap: { [key: string]: string } = {
                       success: COLORS.accent.green,
                       info: COLORS.primary,
@@ -742,7 +722,7 @@ export default function DashboardScreen() {
 
                     return (
                       <TouchableOpacity
-                        key={activity.id}
+                        key={activity.id ?? index}
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
@@ -788,4 +768,3 @@ export default function DashboardScreen() {
     </View>
   );
 }
-

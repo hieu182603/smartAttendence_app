@@ -49,6 +49,14 @@ export default function AttendanceScreen({ navigation, route }: AttendanceScreen
             }
 
             try {
+                // Check if hardware GPS is actually on 
+                const hasServicesEnabled = await Location.hasServicesEnabledAsync();
+                if (!hasServicesEnabled) {
+                    setLocationError('Vui lòng bật GPS trên thiết bị');
+                    Alert.alert('Lỗi GPS', 'Dịch vụ định vị (GPS) đang tắt. Vui lòng bật Location/GPS trong cài đặt thiết bị để tiếp tục.', [{ text: 'OK' }]);
+                    return;
+                }
+
                 let location = await Location.getCurrentPositionAsync({
                     accuracy: Location.Accuracy.High,
                 });
@@ -79,7 +87,7 @@ export default function AttendanceScreen({ navigation, route }: AttendanceScreen
         );
     }
 
-    const handleCaptureAndSubmit = async () => {
+    const handleCapturePreview = async () => {
         if (!cameraRef.current || !location) {
             Alert.alert('Lỗi', 'Đang lấy dữ liệu vị trí hoặc camera chưa sẵn sàng.');
             return;
@@ -87,20 +95,31 @@ export default function AttendanceScreen({ navigation, route }: AttendanceScreen
 
         try {
             setIsProcessing(true);
-
-            // 1. Capture Photo
             const photo = await cameraRef.current.takePictureAsync({
                 quality: 0.5,
                 base64: false,
             });
             setCapturedImage(photo);
+        } catch (error) {
+            console.error('Capture error:', error);
+            Alert.alert('Lỗi', 'Không thể chụp ảnh.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleConfirmSubmit = async () => {
+        if (!capturedImage || !location) return;
+
+        try {
+            setIsProcessing(true);
 
             // 2. Submit to API
             const attendanceData = {
                 latitude: location.coords.latitude,
                 longitude: location.coords.longitude,
                 accuracy: location.coords.accuracy || 0,
-                photo: photo, // Pass the photo object directly
+                photo: capturedImage, // Pass the photo object directly
                 earlyCheckoutReason: mode === 'check-out' ? route.params?.reason : undefined, // Optional reason
             };
 
@@ -119,10 +138,13 @@ export default function AttendanceScreen({ navigation, route }: AttendanceScreen
         } catch (error: any) {
             console.error('Attendance submit error:', error);
             Alert.alert('Lỗi', error.response?.data?.error || error.response?.data?.message || 'Có lỗi xảy ra khi chấm công.');
-            setCapturedImage(null); // Reset on error to try again
         } finally {
             setIsProcessing(false);
         }
+    };
+
+    const handleRetake = () => {
+        setCapturedImage(null);
     };
 
     const toggleCameraFacing = () => {
@@ -190,27 +212,68 @@ export default function AttendanceScreen({ navigation, route }: AttendanceScreen
                     </Text>
                 </View>
 
-                <TouchableOpacity
-                    onPress={handleCaptureAndSubmit}
-                    disabled={isProcessing || !location}
-                    style={[
-                        styles.captureButton,
-                        (isProcessing || !location) && { opacity: 0.7 }
-                    ]}
-                >
-                    {isProcessing ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                        <View style={styles.captureInner}>
-                            {/* Make icon larger and ensure it centers visually */}
-                            <Icon name={mode === 'check-in' ? "face" : "logout"} size={32} color="#fff" />
-                        </View>
-                    )}
-                </TouchableOpacity>
+                {capturedImage ? (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '80%', paddingHorizontal: SPACING.md }}>
+                        {/* Retake Button */}
+                        <TouchableOpacity
+                            onPress={handleRetake}
+                            disabled={isProcessing}
+                            style={[
+                                styles.captureButton,
+                                { backgroundColor: 'rgba(239, 68, 68, 0.2)' },
+                                isProcessing && { opacity: 0.7 }
+                            ]}
+                        >
+                            <View style={[styles.captureInner, { backgroundColor: COLORS.accent.red }]}>
+                                <Icon name="refresh" size={32} color="#fff" />
+                            </View>
+                            <Text style={styles.actionTextOverlay}>Chụp lại</Text>
+                        </TouchableOpacity>
 
-                <Text style={styles.actionText}>
-                    {isProcessing ? 'Đang xử lý...' : `Nhấn để ${mode === 'check-in' ? 'Check-in' : 'Check-out'}`}
-                </Text>
+                        {/* Confirm Button */}
+                        <TouchableOpacity
+                            onPress={handleConfirmSubmit}
+                            disabled={isProcessing}
+                            style={[
+                                styles.captureButton,
+                                { backgroundColor: 'rgba(34, 197, 94, 0.2)' },
+                                isProcessing && { opacity: 0.7 }
+                            ]}
+                        >
+                            <View style={[styles.captureInner, { backgroundColor: COLORS.accent.green }]}>
+                                {isProcessing ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <Icon name="check" size={32} color="#fff" />
+                                )}
+                            </View>
+                            <Text style={styles.actionTextOverlay}>Xác nhận</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View style={{ alignItems: 'center' }}>
+                        <TouchableOpacity
+                            onPress={handleCapturePreview}
+                            disabled={isProcessing || !location}
+                            style={[
+                                styles.captureButton,
+                                (isProcessing || !location) && { opacity: 0.7 }
+                            ]}
+                        >
+                            {isProcessing ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <View style={styles.captureInner}>
+                                    <Icon name={mode === 'check-in' ? "face" : "logout"} size={32} color="#fff" />
+                                </View>
+                            )}
+                        </TouchableOpacity>
+
+                        <Text style={styles.actionText}>
+                            {isProcessing ? 'Đang xử lý...' : `Nhấn để ${mode === 'check-in' ? 'Check-in' : 'Check-out'}`}
+                        </Text>
+                    </View>
+                )}
             </View>
         </View>
     );
@@ -308,4 +371,14 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
     },
+    actionTextOverlay: {
+        position: 'absolute',
+        bottom: -25,
+        textAlign: 'center',
+        width: 100,
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '500',
+        alignSelf: 'center', // helps position relative to captureButton width overrides
+    }
 });

@@ -12,6 +12,7 @@ import { Screen, UserRole } from '../types';
 import { Icon } from './Icon';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
 import { useAuth } from '../context/AuthContext';
+import { useManagerApprovals } from '../hooks/useManagerQueries';
 
 interface MenuItem {
   screen: Screen;
@@ -24,12 +25,16 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   const { logout, userRole } = useAuth();
   const { navigation, state } = props;
 
+  const { data: approvalsData } = useManagerApprovals();
+  const pendingCount = approvalsData?.filter((a: any) => a.status === 'pending').length || 0;
+
   const managerItems: MenuItem[] = [
-    { screen: Screen.ManagerDashboard, icon: 'grid_view', label: 'Dashboard' },
-    { screen: Screen.ManagerTeam, icon: 'groups', label: 'My Team' },
-    { screen: Screen.ManagerApprovals, icon: 'fact_check', label: 'Approvals', badge: 3 },
-    { screen: Screen.ManagerSchedule, icon: 'calendar_month', label: 'Roster Schedule' },
-    { screen: Screen.Profile, icon: 'person', label: 'My Profile' },
+    { screen: Screen.ManagerDashboard, icon: 'dashboard', label: 'Tổng quan' },
+    { screen: Screen.ManagerApprovals, icon: 'fact_check', label: 'Duyệt đơn', badge: pendingCount > 0 ? pendingCount : undefined },
+    { screen: Screen.ManagerTeam, icon: 'groups', label: 'Đội nhóm' },
+    { screen: Screen.ManagerSchedule, icon: 'calendar_month', label: 'Lịch làm việc' },
+    { screen: Screen.TeamReports, icon: 'analytics', label: 'Báo cáo' },
+    { screen: Screen.Settings, icon: 'settings', label: 'Cài đặt' },
   ];
 
   const adminItems: MenuItem[] = [
@@ -51,12 +56,14 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
       [Screen.ManagerTeam]: 'ManagerTeam',
       [Screen.ManagerApprovals]: 'ManagerApprovals',
       [Screen.ManagerSchedule]: 'ManagerSchedule',
+      [Screen.TeamReports]: 'TeamReports',
       [Screen.AdminDashboard]: 'AdminDashboard',
       [Screen.AdminUsers]: 'AdminUsers',
       [Screen.AdminReports]: 'AdminReports',
       [Screen.AdminSettings]: 'AdminSettings',
       [Screen.AdminAudit]: 'AdminAudit',
       [Screen.Profile]: 'Profile',
+      [Screen.Settings]: 'Settings',
     };
     return screenMap[screen] || screen;
   };

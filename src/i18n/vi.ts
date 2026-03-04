@@ -79,6 +79,7 @@ export const vi = {
             today: 'Hôm nay',
             scheduled: 'Đã xếp lịch',
             off: 'Nghỉ / Cuối tuần',
+            late: 'Đi muộn',
         },
         detail: {
             title: 'Chi tiết ca làm',
@@ -91,6 +92,7 @@ export const vi = {
             off: 'Nghỉ',
             missed: 'Đã lỡ',
             scheduled: 'Đã xếp lịch',
+            late: 'Đi muộn',
         },
         noShift: 'Không có ca làm việc trong ngày này',
         daysOfWeek: ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'],

@@ -8,11 +8,16 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { EmployeeTabParamList } from '../../navigation/AppNavigator';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { EmployeeTabParamList, RootStackParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 
-type EmployeeHomeScreenNavigationProp = BottomTabNavigationProp<EmployeeTabParamList, 'Home'>;
+type EmployeeHomeScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<EmployeeTabParamList, 'Home'>,
+  StackNavigationProp<RootStackParamList>
+>;
 
 interface EmployeeHomeScreenProps {
   navigation: EmployeeHomeScreenNavigationProp;
@@ -492,8 +497,7 @@ export default function EmployeeHomeScreen({ navigation }: EmployeeHomeScreenPro
           >
             Upcoming Shifts
           </Text>
-          <TouchableOpacity
-            onPress={navigateToSchedule}
+          <View
             style={{
               backgroundColor: 'rgba(30, 31, 58, 0.6)',
               borderRadius: BORDER_RADIUS.lg,
@@ -583,7 +587,7 @@ export default function EmployeeHomeScreen({ navigation }: EmployeeHomeScreenPro
               </View>
             </View>
             <Icon name="chevron_right" size={20} color="rgba(255, 255, 255, 0.3)" />
-          </TouchableOpacity>
+          </View>
         </View>
       </View>
     </ScrollView>

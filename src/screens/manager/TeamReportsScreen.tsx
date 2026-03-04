@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -14,7 +14,7 @@ import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
-import { ManagerService } from '../../services/manager.service';
+import { useManagerReports } from '../../hooks/useManagerQueries';
 
 type TeamReportsScreenNavigationProp = DrawerNavigationProp<ManagerDrawerParamList, 'TeamReports'>;
 
@@ -25,25 +25,10 @@ interface TeamReportsScreenProps {
 const screenWidth = Dimensions.get('window').width;
 
 export default function TeamReportsScreen({ navigation }: TeamReportsScreenProps) {
-    const [loading, setLoading] = useState(false);
     const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
-    const [stats, setStats] = useState<any>(null);
 
-    useEffect(() => {
-        fetchReports();
-    }, [period]);
-
-    const fetchReports = async () => {
-        try {
-            setLoading(true);
-            const data = await ManagerService.getReports(period);
-            setStats(data);
-        } catch (error) {
-            console.error('Error fetching reports:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // TanStack Query hook
+    const { data: stats, isLoading: loading } = useManagerReports(period);
 
     const chartData = stats ? [
         {

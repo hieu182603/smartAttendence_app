@@ -140,7 +140,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
             },
           ]}
         >
-          Quản Lý Nhân Sự Thông Minh
+          Quản Lý Nhân Sự Thông Minh chó hiệu
         </Animated.Text>
 
         {/* Loading indicator */}

@@ -14,7 +14,7 @@ import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { EmptyState } from '../../components/EmptyState';
-import { useTeam } from '../../hooks/useTeam';
+import { useTeamMembers } from '../../hooks/useManagerQueries';
 import { TeamMember } from '../../types';
 
 type ManagerTeamScreenNavigationProp = DrawerNavigationProp<ManagerDrawerParamList, 'ManagerTeam'>;
@@ -26,7 +26,10 @@ interface ManagerTeamScreenProps {
 type FilterType = 'all' | 'online' | 'on-leave' | 'offline';
 
 export default function ManagerTeamScreen({ navigation }: ManagerTeamScreenProps) {
-  const { members, isLoading, onlineCount, onLeaveCount } = useTeam();
+  const { data: teamData, isLoading } = useTeamMembers();
+  const members: TeamMember[] = (teamData as TeamMember[]) ?? [];
+  const onlineCount = members.filter((m: TeamMember) => m.status === 'online').length;
+  const onLeaveCount = members.filter((m: TeamMember) => m.status === 'on-leave').length;
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
 
@@ -107,7 +110,7 @@ export default function ManagerTeamScreen({ navigation }: ManagerTeamScreenProps
               <Icon name="menu" size={24} color="#ffffff" />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => navigation.navigate('ManagerDashboard')}
+              onPress={() => navigation.navigate('Notifications' as any)}
               style={styles.notificationButton}
               activeOpacity={0.7}
             >

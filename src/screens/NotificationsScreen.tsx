@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,23 +6,26 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../utils/styles';
 import { useTranslation } from '../i18n';
 import { Icon } from '../components/Icon';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Notification } from '../types';
 import { useSocket } from '../context/SocketContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNotificationsList, useMarkAsRead, useMarkAllAsRead, useDeleteNotification } from '../hooks/useNotificationQueries';
+import { queryKeys } from '../hooks/queryKeys';
 
 export default function NotificationsScreen() {
   const navigation = useNavigation();
   const { socket } = useSocket();
   const theme = useTheme();
   const { t } = useTranslation();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
   const mapNotification = (item: any): Notification => {
     const createdDate = item.createdAt ? new Date(item.createdAt) : new Date();
@@ -41,25 +44,24 @@ export default function NotificationsScreen() {
     };
   };
 
-  const fetchNotifications = async () => {
-    try {
-      const { NotificationService } = await import('../services/notification.service');
-      const data = await NotificationService.getAll({ limit: 20 });
-      if (data && Array.isArray(data.notifications)) {
-        setNotifications(data.notifications.map(mapNotification));
-      }
-    } catch (error) {
-      console.log('Error fetching notifications', error);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
+  // TanStack Query hooks
+  const { data: notificationsData, isLoading, refetch } = useNotificationsList({ limit: 20 });
+  const markAsReadMutation = useMarkAsRead();
+  const markAllAsReadMutation = useMarkAllAsRead();
+  const deleteNotificationMutation = useDeleteNotification();
+
+  // Derive notifications from query data
+  const notifications: Notification[] = useMemo(() => {
+    if (!notificationsData || !Array.isArray(notificationsData.notifications)) return [];
+    return notificationsData.notifications.map(mapNotification);
+  }, [notificationsData]);
+
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      fetchNotifications();
-    }, [])
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+    }, [queryClient])
   );
 
   // 🔴 Realtime: Listen for new notifications via Socket.IO
@@ -68,8 +70,7 @@ export default function NotificationsScreen() {
 
     const handleNewNotification = (data: any) => {
       console.log('[Socket] New notification received:', data.title);
-      const mapped = mapNotification(data);
-      setNotifications(prev => [mapped, ...prev]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
     };
 
     socket.on('notification', handleNewNotification);
@@ -77,41 +78,23 @@ export default function NotificationsScreen() {
     return () => {
       socket.off('notification', handleNewNotification);
     };
-  }, [socket]);
+  }, [socket, queryClient]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchNotifications();
-  }, []);
+    refetch().finally(() => setRefreshing(false));
+  }, [refetch]);
 
   const markAsRead = async (id: string) => {
-    try {
-      const { NotificationService } = await import('../services/notification.service');
-      await NotificationService.markAsRead(id);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
-    } catch (error) {
-      console.log('Error marking as read', error);
-    }
+    markAsReadMutation.mutate(id);
   };
 
   const markAllAsRead = async () => {
-    try {
-      const { NotificationService } = await import('../services/notification.service');
-      await NotificationService.markAllAsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
-    } catch (error) {
-      console.log('Error marking all as read', error);
-    }
+    markAllAsReadMutation.mutate();
   };
 
   const deleteNotification = async (id: string) => {
-    try {
-      const { NotificationService } = await import('../services/notification.service');
-      await NotificationService.delete(id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch (error) {
-      console.log('Error deleting notification', error);
-    }
+    deleteNotificationMutation.mutate(id);
   };
 
   const getNotificationBg = (type: string) => {
@@ -121,6 +104,43 @@ export default function NotificationsScreen() {
       case 'warning': return { bg: 'rgba(245, 158, 11, 0.1)', icon: COLORS.accent.yellow };
       default: return { bg: 'rgba(66, 69, 240, 0.1)', icon: COLORS.primary };
     }
+  };
+
+  const renderRightActions = (progress: any, dragX: any, id: string) => {
+    const scale = dragX.interpolate({
+      inputRange: [-80, 0],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <View
+        style={{
+          width: 80,
+          backgroundColor: COLORS.accent.red,
+          justifyContent: 'center',
+          alignItems: 'center',
+          borderTopRightRadius: BORDER_RADIUS.lg,
+          borderBottomRightRadius: BORDER_RADIUS.lg,
+          marginBottom: SPACING.md,
+          marginTop: 1, // small margin to align perfectly with shadows
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => deleteNotification(id)}
+          style={{
+            flex: 1,
+            width: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <Icon name="delete" size={24} color="#ffffff" />
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   return (
@@ -193,65 +213,60 @@ export default function NotificationsScreen() {
             notifications.map((item) => {
               const style = getNotificationBg(item.type);
               return (
-                <TouchableOpacity
+                <Swipeable
                   key={item.id}
-                  onPress={() => item.unread && markAsRead(item.id)}
-                  style={{
-                    backgroundColor: item.unread ? theme.surface : theme.surfaceDarker,
-                    borderRadius: BORDER_RADIUS.lg,
-                    padding: SPACING.md,
-                    marginBottom: SPACING.md,
-                    flexDirection: 'row',
-                    borderWidth: 1,
-                    borderColor: item.unread ? COLORS.primary : 'transparent',
-                    ...SHADOWS.md,
-                  }}
+                  renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item.id)}
+                  overshootRight={false}
                 >
-                  <View
+                  <TouchableOpacity
+                    onPress={() => item.unread && markAsRead(item.id)}
                     style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      backgroundColor: style.bg,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      marginRight: SPACING.md,
+                      backgroundColor: item.unread ? theme.surface : theme.surfaceDarker,
+                      borderRadius: BORDER_RADIUS.lg,
+                      padding: SPACING.md,
+                      marginBottom: SPACING.md,
+                      flexDirection: 'row',
+                      borderWidth: 1,
+                      borderColor: item.unread ? COLORS.primary : 'transparent',
+                      ...SHADOWS.md,
                     }}
                   >
-                    <Icon name={item.icon || 'notifications'} size={20} color={style.icon} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.xs }}>
-                      <Text style={{ color: theme.text.primary, fontWeight: '600', flex: 1 }}>
-                        {item.title}
-                      </Text>
-                      <Text style={{ color: theme.text.secondary, fontSize: 12 }}>
-                        {item.time}
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: style.bg,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginRight: SPACING.md,
+                      }}
+                    >
+                      <Icon name={item.icon || 'notifications'} size={20} color={style.icon} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.xs }}>
+                        <Text style={{ color: theme.text.primary, fontWeight: '600', flex: 1 }}>
+                          {item.title}
+                        </Text>
+                        <Text style={{ color: theme.text.secondary, fontSize: 12 }}>
+                          {item.time}
+                        </Text>
+                      </View>
+                      <Text style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 20 }}>
+                        {item.message}
                       </Text>
                     </View>
-                    <Text style={{ color: theme.text.secondary, fontSize: 13, lineHeight: 20 }}>
-                      {item.message}
-                    </Text>
-                  </View>
 
-                  <View style={{ flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', marginLeft: SPACING.sm }}>
-                    {item.unread ? (
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.accent.red }} />
-                    ) : (
-                      <View style={{ height: 8 }} />
-                    )}
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation(); // Try to stop bubbling if supported
-                        deleteNotification(item.id);
-                      }}
-                      style={{ padding: 8, marginTop: 4, zIndex: 10 }}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Icon name="delete" size={18} color={COLORS.text.secondary} />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
+                    <View style={{ flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-end', marginLeft: SPACING.sm }}>
+                      {item.unread ? (
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.accent.red }} />
+                      ) : (
+                        <View style={{ height: 8 }} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </Swipeable>
               );
             })
           )}

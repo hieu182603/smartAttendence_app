@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -16,7 +16,14 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
-import { AdminService } from '../../services/admin.service';
+import {
+    useDepartments,
+    useManagers,
+    useBranches,
+    useCreateDepartment,
+    useUpdateDepartment,
+    useDeleteDepartment,
+} from '../../hooks/useAdminQueries';
 
 type AdminDepartmentsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'AdminDepartments'>;
 
@@ -44,10 +51,6 @@ interface Branch {
 }
 
 export default function AdminDepartmentsScreen({ navigation }: AdminDepartmentsScreenProps) {
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [managers, setManagers] = useState<User[]>([]);
-    const [branches, setBranches] = useState<Branch[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingDept, setEditingDept] = useState<Department | null>(null);
 
@@ -62,28 +65,13 @@ export default function AdminDepartmentsScreen({ navigation }: AdminDepartmentsS
     const [showManagerPicker, setShowManagerPicker] = useState(false);
     const [showBranchPicker, setShowBranchPicker] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
-        try {
-            setIsLoading(true);
-            const [deptData, managerData, branchData] = await Promise.all([
-                AdminService.getDepartments(),
-                AdminService.getManagers(),
-                AdminService.getBranches()
-            ]);
-            setDepartments(deptData);
-            setManagers(managerData);
-            setBranches(branchData);
-        } catch (error) {
-            console.error('Error loading data', error);
-            Alert.alert('Error', 'Failed to load data');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // TanStack Query hooks
+    const { data: departments = [], isLoading, refetch } = useDepartments();
+    const { data: managers = [] } = useManagers();
+    const { data: branches = [] } = useBranches();
+    const createDepartment = useCreateDepartment();
+    const updateDepartment = useUpdateDepartment();
+    const deleteDepartment = useDeleteDepartment();
 
     const handleEdit = (dept: Department) => {
         setEditingDept(dept);
@@ -114,13 +102,12 @@ export default function AdminDepartmentsScreen({ navigation }: AdminDepartmentsS
                 {
                     text: 'Xóa',
                     style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await AdminService.deleteDepartment(id);
-                            loadData(); // Reload all to be safe
-                        } catch (error) {
-                            Alert.alert('Error', 'Failed to delete department. It might contain employees.');
-                        }
+                    onPress: () => {
+                        deleteDepartment.mutate(id, {
+                            onError: () => {
+                                Alert.alert('Error', 'Failed to delete department. It might contain employees.');
+                            },
+                        });
                     }
                 },
             ]
@@ -137,25 +124,26 @@ export default function AdminDepartmentsScreen({ navigation }: AdminDepartmentsS
             return;
         }
 
-        try {
-            const data = {
-                name,
-                code,
-                description,
-                managerId: selectedManagerId || undefined,
-                branchId: selectedBranchId
-            };
+        const data = {
+            name,
+            code,
+            description,
+            managerId: selectedManagerId || undefined,
+            branchId: selectedBranchId
+        };
 
-            if (editingDept) {
-                await AdminService.updateDepartment(editingDept._id, data);
-            } else {
-                await AdminService.createDepartment(data);
-            }
+        const onSuccess = () => {
             setModalVisible(false);
-            loadData();
-        } catch (error: any) {
+        };
+        const onError = (error: any) => {
             console.error(error);
             Alert.alert('Error', error.response?.data?.message || 'Failed to save department');
+        };
+
+        if (editingDept) {
+            updateDepartment.mutate({ id: editingDept._id, data }, { onSuccess, onError });
+        } else {
+            createDepartment.mutate(data, { onSuccess, onError });
         }
     };
 
@@ -193,8 +181,8 @@ export default function AdminDepartmentsScreen({ navigation }: AdminDepartmentsS
         </View>
     );
 
-    const getManagerName = (id: string) => managers.find(m => m._id === id)?.name || 'Chọn Trưởng phòng';
-    const getBranchName = (id: string) => branches.find(b => b._id === id)?.name || 'Chọn Chi nhánh';
+    const getManagerName = (id: string) => (managers as User[]).find((m: User) => m._id === id)?.name || 'Chọn Trưởng phòng';
+    const getBranchName = (id: string) => (branches as Branch[]).find((b: Branch) => b._id === id)?.name || 'Chọn Chi nhánh';
 
     return (
         <View style={globalStyles.container}>
@@ -224,7 +212,7 @@ export default function AdminDepartmentsScreen({ navigation }: AdminDepartmentsS
                 keyExtractor={item => item._id}
                 contentContainerStyle={{ padding: SPACING.md }}
                 refreshing={isLoading}
-                onRefresh={loadData}
+                onRefresh={() => refetch()}
                 ListEmptyComponent={
                     <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
                         <Text style={{ color: COLORS.text.secondary }}>Chưa có phòng ban nào</Text>
