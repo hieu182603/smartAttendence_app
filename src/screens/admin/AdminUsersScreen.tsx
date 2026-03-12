@@ -10,14 +10,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { AdminDrawerParamList } from '../../navigation/AppNavigator';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { AdminTabParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { UserRole } from '../../types';
 import { AdminService } from '../../services/admin.service';
 
-type AdminUsersScreenNavigationProp = DrawerNavigationProp<AdminDrawerParamList, 'AdminUsers'>;
+type AdminUsersScreenNavigationProp = BottomTabNavigationProp<AdminTabParamList, 'AdminUsers'>;
 
 interface AdminUsersScreenProps {
   navigation: AdminUsersScreenNavigationProp;
@@ -123,7 +123,7 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
           }}
         >
           <TouchableOpacity
-            onPress={() => navigation.openDrawer()}
+            onPress={() => navigation.goBack()}
             style={{
               width: 40,
               height: 40,
@@ -134,7 +134,7 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
               marginRight: SPACING.md,
             }}
           >
-            <Icon name="menu" size={20} color="#ffffff" />
+            <Icon name="arrow_back" size={20} color="#ffffff" />
           </TouchableOpacity>
           <Text
             style={{

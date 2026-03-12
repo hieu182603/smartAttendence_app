@@ -52,7 +52,7 @@ export function useApproveRequest() {
 
     return useMutation({
         mutationFn: ({ id, note }: { id: string; note?: string }) =>
-            ManagerService.approveRequest(id, { reason: note }),
+            ManagerService.approveRequest(id, { comments: note }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.manager.approvals() });
         },
@@ -68,7 +68,7 @@ export function useRejectRequest() {
 
     return useMutation({
         mutationFn: ({ id, note }: { id: string; note: string }) =>
-            ManagerService.rejectRequest(id, { reason: note }),
+            ManagerService.rejectRequest(id, { comments: note }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.manager.approvals() });
         },

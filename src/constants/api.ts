@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 
 // Get API URL from environment variable
 // Expo uses EXPO_PUBLIC_ prefix for public env vars
-const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'https://smartattendance-backend.fly.dev/api';
 
 // Socket.IO connects to the server root (without /api suffix)
 const getSocketUrl = () => {

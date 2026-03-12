@@ -22,14 +22,9 @@ export const ShiftService = {
      * Backend: GET /shifts/my-schedule?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
      */
     getMySchedule: async (startDate: string, endDate: string): Promise<EmployeeSchedule[]> => {
-        try {
-            const response = await api.get('/shifts/my-schedule', {
-                params: { startDate, endDate },
-            });
-            return response.data.data || [];
-        } catch (error) {
-            console.error('[ShiftService] getMySchedule error:', error);
-            return [];
-        }
+        const response = await api.get('/shifts/my-schedule', {
+            params: { startDate, endDate },
+        });
+        return response.data.data || response.data || [];
     },
 };

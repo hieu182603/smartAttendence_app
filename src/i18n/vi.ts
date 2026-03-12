@@ -27,6 +27,7 @@ export const vi = {
         schedule: 'Lịch trình',
         leaves: 'Nghỉ phép',
         profile: 'Cá nhân',
+        settings: 'Cài đặt',
     },
 
     // ── Dashboard ──
@@ -240,6 +241,29 @@ export const vi = {
         noAccount: 'Chưa có tài khoản?',
         register: 'Đăng ký',
     },
+
+    // ── Admin ──
+    admin: {
+        dashboard: {
+            title: 'Quản trị hệ thống',
+            online: 'Đang online',
+            totalEmployees: 'Tổng nhân viên',
+            pendingApprovals: 'Đơn chờ duyệt',
+            attendanceToday: 'Chấm công hôm nay',
+            onTime: 'Đúng giờ',
+            late: 'Đi trễ',
+            absent: 'Vắng mặt',
+            onLeave: 'Nghỉ phép',
+            management: 'Quản lý',
+            users: 'Người dùng',
+            departments: 'Phòng ban',
+            reports: 'Báo cáo',
+            auditLogs: 'Audit Logs',
+            recentActivity: 'Hoạt động gần đây',
+            viewAll: 'Xem tất cả',
+            today: 'Hôm nay',
+        }
+    }
 };
 
 export type Translations = typeof vi;

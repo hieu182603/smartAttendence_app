@@ -9,15 +9,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { BlurView } from 'expo-blur';
+import { ManagerTabParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { EmptyState } from '../../components/EmptyState';
 import { useTeamMembers } from '../../hooks/useManagerQueries';
 import { TeamMember } from '../../types';
 
-type ManagerTeamScreenNavigationProp = DrawerNavigationProp<ManagerDrawerParamList, 'ManagerTeam'>;
+type ManagerTeamScreenNavigationProp = BottomTabNavigationProp<ManagerTabParamList, 'ManagerTeam'>;
 
 interface ManagerTeamScreenProps {
   navigation: ManagerTeamScreenNavigationProp;
@@ -93,22 +94,17 @@ export default function ManagerTeamScreen({ navigation }: ManagerTeamScreenProps
 
   return (
     <View style={globalStyles.container}>
-      {/* Header - Orange/Gold Theme for Manager */}
+      {/* Header - Premium Orange/Gold Mix Theme for Manager */}
       <LinearGradient
-        colors={['#f97316', '#ea580c', '#f59e0b']}
+        colors={['#1A1A2E', '#2A1800', '#FF8C00']}
+        locations={[0, 0.4, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <View style={styles.headerContent}>
           <View style={styles.headerTop}>
-            <TouchableOpacity
-              onPress={() => navigation.openDrawer()}
-              style={styles.menuButton}
-              activeOpacity={0.7}
-            >
-              <Icon name="menu" size={24} color="#ffffff" />
-            </TouchableOpacity>
+            <View style={styles.menuButtonPlaceholder} />
             <TouchableOpacity
               onPress={() => navigation.navigate('Notifications' as any)}
               style={styles.notificationButton}
@@ -157,28 +153,46 @@ export default function ManagerTeamScreen({ navigation }: ManagerTeamScreenProps
 
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: 'rgba(11, 218, 104, 0.1)' }]}>
+          <View style={[styles.statCard]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.02)']}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={[styles.statIconContainer, { backgroundColor: 'rgba(11, 218, 104, 0.2)' }]}>
               <Icon name="people" size={20} color={COLORS.status.success} />
             </View>
-            <Text style={styles.statValue}>{onlineCount}</Text>
-            <Text style={styles.statLabel}>Trực tuyến</Text>
+            <View>
+              <Text style={styles.statValue}>{onlineCount}</Text>
+              <Text style={styles.statLabel}>Trực tuyến</Text>
+            </View>
           </View>
 
-          <View style={[styles.statCard, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+          <View style={[styles.statCard]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.02)']}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={[styles.statIconContainer, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
               <Icon name="event" size={20} color={COLORS.status.warning} />
             </View>
-            <Text style={styles.statValue}>{onLeaveCount}</Text>
-            <Text style={styles.statLabel}>Nghỉ phép</Text>
+            <View>
+              <Text style={styles.statValue}>{onLeaveCount}</Text>
+              <Text style={styles.statLabel}>Nghỉ phép</Text>
+            </View>
           </View>
 
-          <View style={[styles.statCard, { backgroundColor: 'rgba(148, 163, 184, 0.1)' }]}>
+          <View style={[styles.statCard]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.02)']}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={[styles.statIconContainer, { backgroundColor: 'rgba(148, 163, 184, 0.2)' }]}>
               <Icon name="person_off" size={20} color={COLORS.text.secondary} />
             </View>
-            <Text style={styles.statValue}>{offlineCount}</Text>
-            <Text style={styles.statLabel}>Offline</Text>
+            <View>
+              <Text style={styles.statValue}>{offlineCount}</Text>
+              <Text style={styles.statLabel}>Offline</Text>
+            </View>
           </View>
         </View>
 
@@ -316,9 +330,12 @@ export default function ManagerTeamScreen({ navigation }: ManagerTeamScreenProps
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: SPACING.xxl,
+    paddingTop: SPACING.xxl * 2,
     paddingBottom: SPACING.xl,
     paddingHorizontal: SPACING.lg,
+    borderBottomLeftRadius: BORDER_RADIUS.xxl,
+    borderBottomRightRadius: BORDER_RADIUS.xxl,
+    marginBottom: SPACING.md,
   },
   headerContent: {
     zIndex: 10,
@@ -327,15 +344,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.sm,
   },
-  menuButton: {
+  menuButtonPlaceholder: {
     width: 40,
     height: 40,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   notificationButton: {
     width: 40,
@@ -394,24 +407,27 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    padding: SPACING.md,
+    padding: SPACING.sm,
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(30, 30, 50, 0.5)',
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   statIconContainer: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: BORDER_RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.text.primary,
-    marginBottom: SPACING.xs,
   },
   statLabel: {
     fontSize: 12,

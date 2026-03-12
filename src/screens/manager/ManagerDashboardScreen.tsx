@@ -1,38 +1,36 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { ManagerTabParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
-import { StatCard } from '../../components/StatCard';
+import { ManagerStatCard } from '../../components/ManagerStatCard';
 import { EmptyState } from '../../components/EmptyState';
 import { useUnreadCount } from '../../hooks/useNotificationQueries';
 import { useManagerApprovals, useTeamMembers } from '../../hooks/useManagerQueries';
 import { useAuth } from '../../context/AuthContext';
 import { ApprovalRequest } from '../../types';
-
-type ManagerDashboardScreenNavigationProp = DrawerNavigationProp<ManagerDrawerParamList, 'ManagerDashboard'>;
+type ManagerDashboardScreenNavigationProp = BottomTabNavigationProp<ManagerTabParamList, 'ManagerDashboard'>;
 
 interface ManagerDashboardScreenProps {
   navigation: ManagerDashboardScreenNavigationProp;
 }
 
-const { width } = Dimensions.get('window');
-const cardWidth = (width - SPACING.xl * 2 - SPACING.sm) / 2;
 
 export default function ManagerDashboardScreen({ navigation }: ManagerDashboardScreenProps) {
   const { user } = useAuth();
+  const { width } = useWindowDimensions();
 
-  // TanStack Query hooks
+  // TanStack Query hooks — filter pending at API level to avoid over-fetching
   const { data: unreadData } = useUnreadCount();
-  const { data: approvalsData, isLoading: approvalsLoading } = useManagerApprovals();
+  const { data: approvalsData, isLoading: approvalsLoading } = useManagerApprovals({ status: 'pending' });
   const { data: teamData, isLoading: teamLoading } = useTeamMembers();
 
   // Derive data from queries
   const unreadCount = (unreadData as any)?.count ?? 0;
   const approvals: ApprovalRequest[] = approvalsData ?? [];
-  const pendingCount = approvals.filter((a: ApprovalRequest) => a.status === 'pending').length;
+  const pendingCount = approvals.length; // already filtered server-side
   const members = teamData ?? [];
   const onlineCount = (members as any[]).filter((m: any) => m.status === 'online').length;
   const onLeaveCount = (members as any[]).filter((m: any) => m.status === 'on-leave').length;
@@ -56,9 +54,10 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* Header - Orange/Gold Theme for Manager */}
+        {/* Header - Premium Orange/Gold Mix Theme for Manager */}
         <LinearGradient
-          colors={['#FF9800', '#F57C00', '#FFC107']}
+          colors={['#1A1A2E', '#2A1800', '#FF8C00']}
+          locations={[0, 0.4, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.header}
@@ -68,9 +67,10 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
             <View style={styles.userInfo}>
               <View style={styles.avatarContainer}>
                 {userAvatar ? (
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>IMG</Text>
-                  </View>
+                  <Image
+                    source={{ uri: userAvatar }}
+                    style={styles.avatar}
+                  />
                 ) : (
                   <View style={styles.avatar}>
                     <Text style={styles.avatarText}>
@@ -114,33 +114,37 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
 
         {/* Main Content */}
         <View style={styles.content}>
-          {/* Manager Stats - Orange Theme */}
+          {/* Manager Stats - Premium Glassmorphism */}
           <View style={styles.statsGrid}>
             <View style={styles.statsRow}>
-              <StatCard
+              <ManagerStatCard
+                key="pending"
                 icon="pending_actions"
                 title="Chờ duyệt"
                 value={approvalsLoading ? '...' : pendingCount}
                 unit="đơn nghỉ phép"
                 color="warning"
               />
-              <StatCard
+              <ManagerStatCard
+                key="members"
                 icon="groups"
                 title="Thành viên"
                 value={teamLoading ? '...' : (members as any[]).length}
                 unit="nhân viên"
-                color="warning"
+                color="info"
               />
             </View>
             <View style={styles.statsRow}>
-              <StatCard
+              <ManagerStatCard
+                key="online"
                 icon="how_to_reg"
                 title="Đang làm việc"
                 value={teamLoading ? '...' : onlineCount}
-                unit="người trực tuyến"
+                unit="trực tuyến"
                 color="success"
               />
-              <StatCard
+              <ManagerStatCard
+                key="on-leave"
                 icon="event_busy"
                 title="Đang nghỉ"
                 value={teamLoading ? '...' : onLeaveCount}
@@ -327,6 +331,7 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
             </View>
             <View style={styles.quickActionsGrid}>
               <TouchableOpacity
+                key="approve"
                 style={styles.quickActionCard}
                 onPress={() => navigation.navigate('ManagerApprovals')}
               >
@@ -341,6 +346,7 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
               </TouchableOpacity>
 
               <TouchableOpacity
+                key="schedule"
                 style={styles.quickActionCard}
                 onPress={() => navigation.navigate('ManagerSchedule')}
               >
@@ -354,7 +360,11 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
                 <Text style={styles.quickActionSubtitle}>Xem lịch làm việc</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.quickActionCard}>
+              <TouchableOpacity
+                key="reports"
+                style={styles.quickActionCard}
+                onPress={() => navigation.navigate('ManagerTeam')}
+              >
                 <LinearGradient
                   colors={['rgba(11, 218, 104, 0.2)', 'rgba(11, 218, 104, 0.1)']}
                   style={styles.quickActionIcon}
@@ -366,6 +376,7 @@ export default function ManagerDashboardScreen({ navigation }: ManagerDashboardS
               </TouchableOpacity>
 
               <TouchableOpacity
+                key="team-manage"
                 style={styles.quickActionCard}
                 onPress={() => navigation.navigate('ManagerTeam')}
               >
@@ -480,7 +491,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
   welcomeSubtitle: {
     fontSize: 14,
@@ -674,6 +685,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: BORDER_RADIUS.sm,
     borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)', // default; overridden inline per status
   },
   memberStatusText: {
     fontSize: 11,
@@ -693,7 +705,8 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   quickActionCard: {
-    width: cardWidth,
+    flexBasis: '47%',
+    flexGrow: 1,
     backgroundColor: COLORS.surface.dark,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING.md,

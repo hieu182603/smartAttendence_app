@@ -8,7 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Modal,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -24,8 +24,9 @@ import { usePreferences } from '../../context/PreferencesContext';
 
 // TanStack Query hooks
 import { useLeaveBalance } from '../../hooks/useLeaveQueries';
-import { useRecentAttendance } from '../../hooks/useAttendanceQueries';
+import { useRecentAttendance, useAttendanceHistory } from '../../hooks/useAttendanceQueries';
 import { useNotificationsList, useUnreadCount } from '../../hooks/useNotificationQueries';
+import { useShiftSchedule } from '../../hooks/useShiftQueries';
 import { queryKeys } from '../../hooks/queryKeys';
 
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -40,7 +41,7 @@ interface DashboardScreenProps {
   navigation: DashboardScreenNavigationProp;
 }
 
-const { width } = Dimensions.get('window');
+// width is now obtained inside component via useWindowDimensions()
 
 export default function DashboardScreen() {
   const { user } = useAuth();
@@ -50,6 +51,20 @@ export default function DashboardScreen() {
   const { notificationsEnabled } = usePreferences();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const { width } = useWindowDimensions();
+
+  // ─── Date calculations for queries ──────────────────────────────
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const todayStr = now.toISOString().split('T')[0];
+  // Next 7 days for shift lookup
+  const nextWeek = new Date(now);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekStr = nextWeek.toISOString().split('T')[0];
+  // First and last day of current month for attendance count
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
   // ─── TanStack Query hooks ───────────────────────────────────────
   const {
@@ -73,17 +88,59 @@ export default function DashboardScreen() {
     refetch: refetchNotifications,
   } = useNotificationsList({ limit: 3, unreadOnly: true });
 
-  const isLoading = isLeaveLoading && isAttendanceLoading;
+  // Fetch shift schedule for next 7 days
+  const {
+    data: shiftData,
+    isLoading: isShiftLoading,
+  } = useShiftSchedule(todayStr, nextWeekStr);
+
+  // Fetch attendance history for current month to count days worked
+  const {
+    data: monthlyAttendance,
+    isLoading: isMonthlyLoading,
+  } = useAttendanceHistory({ from: firstDayOfMonth, to: lastDayOfMonth, limit: 50 });
+
+  const isLoading = isLeaveLoading || isAttendanceLoading;
+
+  // ─── Computed: next shift ───────────────────────────────────────
+  const nextShift = useMemo(() => {
+    if (!Array.isArray(shiftData) || shiftData.length === 0) {
+      return { day: '--', time: '--:-- - --:--' };
+    }
+    // Find the next upcoming shift (today or future)
+    const upcoming = shiftData
+      .filter((s: any) => s.date >= todayStr)
+      .sort((a: any, b: any) => a.date.localeCompare(b.date))[0];
+
+    if (!upcoming) return { day: '--', time: '--:-- - --:--' };
+
+    const shiftDate = new Date(upcoming.date + 'T00:00:00');
+    const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+    const dayName = dayNames[shiftDate.getDay()];
+    const startTime = upcoming.startTime || '--:--';
+    const endTime = upcoming.endTime || '--:--';
+
+    return { day: dayName, time: `${startTime} - ${endTime}` };
+  }, [shiftData, todayStr]);
+
+  // ─── Computed: monthly attendance count ─────────────────────────
+  const attendanceThisMonth = useMemo(() => {
+    const records = monthlyAttendance?.records || monthlyAttendance;
+    if (!Array.isArray(records)) return 0;
+    // Count days with at least a check-in (present or late, not absent)
+    return records.filter((r: any) =>
+      r.status === 'present' || r.status === 'ontime' || r.status === 'late'
+    ).length;
+  }, [monthlyAttendance]);
 
   // ─── Derived state from query data ──────────────────────────────
   const stats = useMemo(() => ({
-    attendanceLikelihood: 100,
     leavesRemaining: leaveBalance?.annual?.remaining || 0,
     totalLeaves: leaveBalance?.annual?.total || 12,
     overtimeHours: 0,
-    thisMonth: 0,
-    totalDays: 0,
-  }), [leaveBalance]);
+    thisMonth: attendanceThisMonth,
+    totalDays: totalDaysInMonth,
+  }), [leaveBalance, attendanceThisMonth, totalDaysInMonth]);
 
   const unreadCount = unreadData?.count ?? 0;
 
@@ -278,7 +335,8 @@ export default function DashboardScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ position: 'relative', marginRight: SPACING.md }}>
                   {userAvatar ? (
-                    <View
+                    <Image
+                      source={{ uri: userAvatar }}
                       style={{
                         width: 48,
                         height: 48,
@@ -287,9 +345,7 @@ export default function DashboardScreen() {
                         borderColor: '#ffffff',
                         ...SHADOWS.lg,
                       }}
-                    >
-                      {/* Image would go here */}
-                    </View>
+                    />
                   ) : (
                     <View
                       style={{
@@ -568,10 +624,10 @@ export default function DashboardScreen() {
                       marginBottom: SPACING.xs / 2,
                     }}
                   >
-                    Thứ Hai
+                    {isShiftLoading ? '...' : nextShift.day}
                   </Text>
                   <Text style={{ fontSize: 11, color: theme.text.secondary }}>
-                    08:00 - 17:00
+                    {isShiftLoading ? '...' : nextShift.time}
                   </Text>
                 </View>
               </View>

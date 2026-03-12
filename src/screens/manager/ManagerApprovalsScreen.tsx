@@ -13,15 +13,16 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
+import { BlurView } from 'expo-blur';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { ManagerTabParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { EmptyState } from '../../components/EmptyState';
 import { useManagerApprovals, useApproveRequest, useRejectRequest } from '../../hooks/useManagerQueries';
 import { ApprovalRequest } from '../../types';
 
-type ManagerApprovalsScreenNavigationProp = DrawerNavigationProp<ManagerDrawerParamList, 'ManagerApprovals'>;
+type ManagerApprovalsScreenNavigationProp = BottomTabNavigationProp<ManagerTabParamList, 'ManagerApprovals'>;
 
 interface ManagerApprovalsScreenProps {
   navigation: ManagerApprovalsScreenNavigationProp;
@@ -133,22 +134,17 @@ export default function ManagerApprovalsScreen({ navigation }: ManagerApprovalsS
 
   return (
     <View style={globalStyles.container}>
-      {/* Header - Orange/Gold Theme for Manager */}
+      {/* Header - Premium Orange/Gold Mix Theme for Manager */}
       <LinearGradient
-        colors={['#f97316', '#ea580c', '#f59e0b']}
+        colors={['#1A1A2E', '#2A1800', '#FF8C00']}
+        locations={[0, 0.4, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <View style={styles.headerContent}>
           <View style={styles.headerTop}>
-            <TouchableOpacity
-              onPress={() => navigation.openDrawer()}
-              style={styles.menuButton}
-              activeOpacity={0.7}
-            >
-              <Icon name="menu" size={24} color="#ffffff" />
-            </TouchableOpacity>
+            <View style={styles.menuButtonPlaceholder} />
             {pendingCount > 0 && (
               <View style={styles.badgeContainer}>
                 <Text style={styles.badgeText}>{pendingCount} đơn</Text>
@@ -193,28 +189,46 @@ export default function ManagerApprovalsScreen({ navigation }: ManagerApprovalsS
 
         {/* Stats Summary */}
         <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
+          <View style={[styles.statCard]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.02)']}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={[styles.statIconContainer, { backgroundColor: 'rgba(249, 115, 22, 0.2)' }]}>
               <Icon name="schedule" size={20} color="#f97316" />
             </View>
-            <Text style={styles.statValue}>{pendingCount}</Text>
-            <Text style={styles.statLabel}>Chờ duyệt</Text>
+            <View>
+              <Text style={styles.statValue}>{pendingCount}</Text>
+              <Text style={styles.statLabel}>Chờ duyệt</Text>
+            </View>
           </View>
 
-          <View style={[styles.statCard, { backgroundColor: 'rgba(11, 218, 104, 0.1)' }]}>
+          <View style={[styles.statCard]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.02)']}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={[styles.statIconContainer, { backgroundColor: 'rgba(11, 218, 104, 0.2)' }]}>
               <Icon name="check_circle" size={20} color={COLORS.status.success} />
             </View>
-            <Text style={styles.statValue}>{approvedCount}</Text>
-            <Text style={styles.statLabel}>Đã duyệt</Text>
+            <View>
+              <Text style={styles.statValue}>{approvedCount}</Text>
+              <Text style={styles.statLabel}>Đã duyệt</Text>
+            </View>
           </View>
 
-          <View style={[styles.statCard, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+          <View style={[styles.statCard]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.02)']}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={[styles.statIconContainer, { backgroundColor: 'rgba(239, 68, 68, 0.2)' }]}>
               <Icon name="error" size={20} color={COLORS.status.error} />
             </View>
-            <Text style={styles.statValue}>{rejectedCount}</Text>
-            <Text style={styles.statLabel}>Từ chối</Text>
+            <View>
+              <Text style={styles.statValue}>{rejectedCount}</Text>
+              <Text style={styles.statLabel}>Từ chối</Text>
+            </View>
           </View>
         </View>
 
@@ -297,28 +311,57 @@ export default function ManagerApprovalsScreen({ navigation }: ManagerApprovalsS
                         </View>
                       </View>
 
-                      {/* Action Buttons */}
-                      <View style={styles.actionsContainer}>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.approveButton]}
-                          onPress={() => handleApprove(approval)}
-                          disabled={isProcessing}
-                          activeOpacity={0.7}
-                        >
-                          <Icon name="check_circle" size={18} color="#ffffff" />
-                          <Text style={styles.approveButtonText}>Duyệt</Text>
-                        </TouchableOpacity>
+                      {/* Action Buttons - only for pending */}
+                      {approval.status === 'pending' ? (
+                        <View style={styles.actionsContainer}>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.approveButton]}
+                            onPress={() => handleApprove(approval)}
+                            disabled={isProcessing}
+                            activeOpacity={0.7}
+                          >
+                            <Icon name="check_circle" size={18} color="#ffffff" />
+                            <Text style={styles.approveButtonText}>Duyệt</Text>
+                          </TouchableOpacity>
 
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.rejectButton]}
-                          onPress={() => openRejectDialog(approval)}
-                          disabled={isProcessing}
-                          activeOpacity={0.7}
-                        >
-                          <Icon name="error" size={18} color={COLORS.status.error} />
-                          <Text style={styles.rejectButtonText}>Từ chối</Text>
-                        </TouchableOpacity>
-                      </View>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.rejectButton]}
+                            onPress={() => openRejectDialog(approval)}
+                            disabled={isProcessing}
+                            activeOpacity={0.7}
+                          >
+                            <Icon name="error" size={18} color={COLORS.status.error} />
+                            <Text style={styles.rejectButtonText}>Từ chối</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={styles.actionsContainer}>
+                          <View style={[
+                            styles.statusBadge,
+                            {
+                              backgroundColor: approval.status === 'approved'
+                                ? 'rgba(11, 218, 104, 0.1)'
+                                : 'rgba(239, 68, 68, 0.1)',
+                            },
+                          ]}>
+                            <Icon
+                              name={approval.status === 'approved' ? 'check_circle' : 'cancel'}
+                              size={16}
+                              color={approval.status === 'approved' ? COLORS.status.success : COLORS.status.error}
+                            />
+                            <Text style={[
+                              styles.statusBadgeText,
+                              {
+                                color: approval.status === 'approved'
+                                  ? COLORS.status.success
+                                  : COLORS.status.error,
+                              },
+                            ]}>
+                              {approval.status === 'approved' ? 'Đã duyệt' : 'Đã từ chối'}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -339,6 +382,7 @@ export default function ManagerApprovalsScreen({ navigation }: ManagerApprovalsS
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalContainer}
         >
+          <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -417,9 +461,12 @@ export default function ManagerApprovalsScreen({ navigation }: ManagerApprovalsS
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: SPACING.xxl,
+    paddingTop: SPACING.xxl * 2,
     paddingBottom: SPACING.xl,
     paddingHorizontal: SPACING.lg,
+    borderBottomLeftRadius: BORDER_RADIUS.xxl,
+    borderBottomRightRadius: BORDER_RADIUS.xxl,
+    marginBottom: SPACING.md,
   },
   headerContent: {
     zIndex: 10,
@@ -430,13 +477,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.lg,
   },
-  menuButton: {
+  menuButtonPlaceholder: {
     width: 40,
     height: 40,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   badgeContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -500,24 +543,27 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    padding: SPACING.md,
+    padding: SPACING.sm,
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(30, 30, 50, 0.5)',
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   statIconContainer: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: BORDER_RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.text.primary,
-    marginBottom: SPACING.xs,
   },
   statLabel: {
     fontSize: 12,
@@ -537,12 +583,12 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   approvalCard: {
-    backgroundColor: COLORS.surface.dark,
+    backgroundColor: 'rgba(30, 30, 50, 0.5)',
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
     borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.2)',
-    ...SHADOWS.sm,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    ...SHADOWS.md,
   },
   approvalContent: {
     flexDirection: 'row',
@@ -653,6 +699,18 @@ const styles = StyleSheet.create({
   rejectButtonText: {
     color: COLORS.status.error,
     fontSize: 14,
+    fontWeight: '600',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  statusBadgeText: {
+    fontSize: 13,
     fontWeight: '600',
   },
   // Modal styles

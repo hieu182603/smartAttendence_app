@@ -28,6 +28,7 @@ const iconMap: { [key: string]: { family: string; name: string } } = {
   calendar_month: { family: 'Ionicons', name: 'calendar' },
   history_toggle_off: { family: 'MaterialIcons', name: 'history' },
   history_edu: { family: 'MaterialIcons', name: 'history-edu' },
+  history: { family: 'MaterialIcons', name: 'history' },
   timelapse: { family: 'MaterialIcons', name: 'timelapse' },
   date_range: { family: 'MaterialIcons', name: 'date-range' },
 
@@ -53,6 +54,8 @@ const iconMap: { [key: string]: { family: string; name: string } } = {
   error: { family: 'Ionicons', name: 'close-circle' },
   warning: { family: 'Ionicons', name: 'warning' },
   info: { family: 'Ionicons', name: 'information-circle' },
+  gpp_bad: { family: 'MaterialIcons', name: 'gpp-bad' },
+  restore: { family: 'MaterialIcons', name: 'restore' },
 
   // Business
   business: { family: 'Ionicons', name: 'business' },
@@ -64,6 +67,9 @@ const iconMap: { [key: string]: { family: string; name: string } } = {
   manage_accounts: { family: 'MaterialIcons', name: 'manage-accounts' },
   assignment: { family: 'Ionicons', name: 'document-text' },
   fact_check: { family: 'MaterialIcons', name: 'fact-check' },
+  pending_actions: { family: 'MaterialIcons', name: 'pending-actions' },
+  how_to_reg: { family: 'MaterialIcons', name: 'how-to-reg' },
+  event_busy: { family: 'MaterialIcons', name: 'event-busy' },
 
   // Analytics
   analytics: { family: 'Ionicons', name: 'analytics' },
@@ -130,6 +136,8 @@ const iconMap: { [key: string]: { family: string; name: string } } = {
   delete_sweep: { family: 'MaterialIcons', name: 'delete-sweep' },
   description: { family: 'MaterialIcons', name: 'description' },
   privacy_tip: { family: 'MaterialIcons', name: 'privacy-tip' },
+  security: { family: 'Ionicons', name: 'shield-checkmark' },
+  tune: { family: 'MaterialIcons', name: 'tune' },
 };
 
 export const Icon: React.FC<IconProps> = ({

@@ -1,6 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import api from '../libs/axios';
+import { AUTH_EXPIRED_EVENT } from '../libs/axios';
 import { AUTH_endpoints } from '../constants/api';
 import { AuthResponse, User } from '../types/auth';
 import { UserRole } from '../types';
@@ -32,6 +34,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         checkAuth();
     }, []);
 
+    // Listen for 401 session expired events from axios interceptor
+    useEffect(() => {
+        const subscription = DeviceEventEmitter.addListener(AUTH_EXPIRED_EVENT, () => {
+            console.log('[Auth] Session expired event received, clearing state');
+            setToken(null);
+            setUser(null);
+        });
+
+        return () => subscription.remove();
+    }, []);
+
     const checkAuth = async () => {
         try {
             const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
@@ -41,9 +54,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setToken(storedToken);
                 setUser(JSON.parse(storedUser));
 
-                // Optionally verify token with backend
-                // const response = await api.get(AUTH_endpoints.ME);
-                // setUser(response.data);
+                // Verify token with backend (non-blocking)
+                try {
+                    const response = await api.get(AUTH_endpoints.ME);
+                    if (response.data) {
+                        // Update user data with fresh info from server
+                        setUser(response.data.user || response.data);
+                        await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data.user || response.data));
+                    }
+                } catch (verifyErr: any) {
+                    // If 401, token is invalid → clear everything
+                    if (verifyErr.response?.status === 401) {
+                        console.log('[Auth] Stored token is invalid, clearing');
+                        await AsyncStorage.removeItem(TOKEN_KEY);
+                        await AsyncStorage.removeItem(USER_KEY);
+                        setToken(null);
+                        setUser(null);
+                    }
+                    // Other errors (network etc.) → keep cached user for now
+                }
             }
         } catch (e) {
             console.log('Auth check error', e);
@@ -67,11 +96,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             await AsyncStorage.setItem(TOKEN_KEY, token);
             if (rememberMe) {
+                // Persist user data to survive app restart
                 await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
             } else {
-                // If not remember me, we might still want to persist user for the session
-                // But here we'll persist it to survive app reload during dev
-                await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+                // Don't persist user — they'll need to re-login after app restart
+                await AsyncStorage.removeItem(USER_KEY);
             }
 
         } catch (err: any) {
@@ -112,3 +141,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export const useAuth = () => useContext(AuthContext);
+

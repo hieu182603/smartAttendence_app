@@ -351,9 +351,9 @@ export default function RequestsScreen({ navigation }: RequestsScreenProps) {
         </View>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-          {Array.isArray(leaveBalance) && leaveBalance.map((item: any) => (
+          {Array.isArray(leaveBalance) && leaveBalance.map((item: any, index: number) => (
             <View
-              key={item.id}
+              key={item.id || index}
               style={{
                 width: '48%',
                 backgroundColor: theme.cardBg,

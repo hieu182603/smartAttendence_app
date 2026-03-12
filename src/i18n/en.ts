@@ -29,6 +29,7 @@ export const en: Translations = {
         schedule: 'Schedule',
         leaves: 'Leaves',
         profile: 'Profile',
+        settings: 'Settings',
     },
 
     // ── Dashboard ──
@@ -242,4 +243,27 @@ export const en: Translations = {
         noAccount: "Don't have an account?",
         register: 'Register',
     },
+
+    // ── Admin ──
+    admin: {
+        dashboard: {
+            title: 'System Management',
+            online: 'Online',
+            totalEmployees: 'Total Employees',
+            pendingApprovals: 'Pending Approvals',
+            attendanceToday: "Today's Attendance",
+            onTime: 'On Time',
+            late: 'Late',
+            absent: 'Absent',
+            onLeave: 'On Leave',
+            management: 'Management',
+            users: 'Users',
+            departments: 'Departments',
+            reports: 'Reports',
+            auditLogs: 'Audit Logs',
+            recentActivity: 'Recent Activity',
+            viewAll: 'View All',
+            today: 'Today',
+        }
+    }
 };

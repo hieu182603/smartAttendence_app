@@ -24,13 +24,8 @@ export const AdminService = {
 
     // Positions
     getPositions: async () => {
-        try {
-            const response = await api.get('/positions');
-            return response.data.positions || response.data;
-        } catch (e) {
-            console.log('Error fetching positions, using defaults', e);
-            return [];
-        }
+        const response = await api.get('/positions');
+        return response.data.positions || response.data;
     },
 
     createPosition: async (data: { title: string; level: number }) => {
@@ -73,16 +68,7 @@ export const AdminService = {
 
     // Settings
     getSystemSettings: async () => {
-        try {
-            const response = await api.get('/settings');
-            return response.data;
-        } catch (e) {
-            console.log('Error fetching settings, using defaults', e);
-            return {
-                workStartTime: '08:00',
-                workEndTime: '17:00',
-                allowedLateMinutes: 15
-            };
-        }
+        const response = await api.get('/settings');
+        return response.data;
     }
 };

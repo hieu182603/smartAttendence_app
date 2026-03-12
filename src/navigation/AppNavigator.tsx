@@ -6,6 +6,8 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import { UserRole } from '../types';
 import { CustomBottomTabBar } from '../components/BottomNav';
 import { CustomDrawerContent } from '../components/Sidebar';
+import { ManagerBottomTabBar } from '../components/ManagerBottomNav';
+import { AdminBottomTabBar } from '../components/AdminBottomNav';
 
 // Import Screens
 import SplashScreen from '../screens/SplashScreen';
@@ -45,7 +47,7 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   EmployeeTabs: undefined;
   ManagerDrawer: undefined;
-  AdminDrawer: undefined;
+  AdminTabs: undefined;
   AttendanceHistory: undefined;
   Attendance: { mode: 'check-in' | 'check-out'; reason?: string } | undefined;
   AdminDepartments: undefined;
@@ -62,19 +64,7 @@ export type EmployeeTabParamList = {
   ChangePassword: undefined;
   Settings: undefined;
 };
-
-export type ManagerDrawerParamList = {
-  ManagerDashboard: undefined;
-  ManagerTeam: undefined;
-  TeamReports: undefined;
-  ManagerApprovals: undefined;
-  ManagerSchedule: undefined;
-  Profile: undefined;
-  ChangePassword: undefined;
-  Settings: undefined;
-};
-
-export type AdminDrawerParamList = {
+export type AdminTabParamList = {
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminReports: undefined;
@@ -84,9 +74,21 @@ export type AdminDrawerParamList = {
   ChangePassword: undefined;
   Settings: undefined;
 };
+export type ManagerTabParamList = {
+  ManagerDashboard: undefined;
+  ManagerTeam: undefined;
+  ManagerApprovals: undefined;
+  ManagerSchedule: undefined;
+  TeamReports: undefined;
+  Profile: undefined;
+  ChangePassword: undefined;
+  Settings: undefined;
+};
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<EmployeeTabParamList>();
+const ManagerTab = createBottomTabNavigator<ManagerTabParamList>();
+const AdminTab = createBottomTabNavigator<AdminTabParamList>();
 const Drawer = createDrawerNavigator();
 
 interface AppNavigatorProps {
@@ -118,135 +120,65 @@ function EmployeeTabNavigator() {
   );
 }
 
-// Manager Drawer Navigator
-function ManagerDrawerNavigator() {
+// Manager Tab Navigator
+function ManagerTabNavigator() {
   return (
-    <Drawer.Navigator
+    <ManagerTab.Navigator
       screenOptions={{
         headerShown: false,
-        drawerStyle: {
-          backgroundColor: '#15152a',
-          width: 280,
+        tabBarShowLabel: false,
+        tabBarStyle: {
+          display: 'none', // Hide default tab bar, we'll use custom one
         },
-        overlayColor: 'rgba(0, 0, 0, 0.6)',
-        drawerType: 'front',
       }}
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      tabBar={(props) => <ManagerBottomTabBar {...props} />}
     >
-      <Drawer.Screen
-        name="ManagerDashboard"
-        component={ManagerDashboardScreen}
-        options={{ drawerLabel: 'Dashboard' }}
-      />
-      <Drawer.Screen
-        name="ManagerTeam"
-        component={ManagerTeamScreen}
-        options={{ drawerLabel: 'Team' }}
-      />
-      <Drawer.Screen
-        name="TeamReports"
-        component={TeamReportsScreen}
-        options={{ drawerLabel: 'Báo cáo' }}
-      />
-      <Drawer.Screen
-        name="ManagerApprovals"
-        component={ManagerApprovalsScreen}
-        options={{ drawerLabel: 'Approvals' }}
-      />
-      <Drawer.Screen
-        name="ManagerSchedule"
-        component={ManagerScheduleScreen}
-        options={{ drawerLabel: 'Schedule' }}
-      />
-      <Drawer.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ drawerLabel: 'Profile' }}
-      />
-      <Drawer.Screen
-        name="ChangePassword"
-        component={ChangePasswordScreen}
-        options={{ drawerLabel: 'Đổi mật khẩu', drawerItemStyle: { display: 'none' } }}
-      />
-      <Drawer.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{ drawerLabel: 'Cài đặt' }}
-      />
-    </Drawer.Navigator>
+      <ManagerTab.Screen name="ManagerDashboard" component={ManagerDashboardScreen} />
+      <ManagerTab.Screen name="ManagerTeam" component={ManagerTeamScreen} />
+      <ManagerTab.Screen name="ManagerApprovals" component={ManagerApprovalsScreen} options={{ tabBarButton: () => null }} />
+      <ManagerTab.Screen name="ManagerSchedule" component={ManagerScheduleScreen} />
+      <ManagerTab.Screen name="TeamReports" component={TeamReportsScreen} options={{ tabBarButton: () => null }} />
+      <ManagerTab.Screen name="Profile" component={ProfileScreen} />
+      <ManagerTab.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ tabBarButton: () => null }} />
+      <ManagerTab.Screen name="Settings" component={SettingsScreen} options={{ tabBarButton: () => null }} />
+    </ManagerTab.Navigator>
   );
 }
 
-// Admin Drawer Navigator
-function AdminDrawerNavigator() {
+// Admin Tab Navigator
+function AdminTabNavigator() {
   return (
-    <Drawer.Navigator
+    <AdminTab.Navigator
       screenOptions={{
         headerShown: false,
-        drawerStyle: {
-          backgroundColor: '#15152a',
-          width: 280,
+        tabBarShowLabel: false,
+        tabBarStyle: {
+          display: 'none', // Hide default tab bar, we'll use custom one
         },
-        overlayColor: 'rgba(0, 0, 0, 0.6)',
-        drawerType: 'front',
       }}
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      tabBar={(props) => <AdminBottomTabBar {...props} />}
     >
-      <Drawer.Screen
-        name="AdminDashboard"
-        component={AdminDashboardScreen}
-        options={{ drawerLabel: 'Dashboard' }}
-      />
-      <Drawer.Screen
-        name="AdminUsers"
-        component={AdminUsersScreen}
-        options={{ drawerLabel: 'Users' }}
-      />
-      <Drawer.Screen
-        name="AdminReports"
-        component={AdminReportsScreen}
-        options={{ drawerLabel: 'Reports' }}
-      />
-      <Drawer.Screen
-        name="AdminSettings"
-        component={AdminSettingsScreen}
-        options={{ drawerLabel: 'Settings' }}
-      />
-      <Drawer.Screen
-        name="AdminAudit"
-        component={AdminAuditScreen}
-        options={{ drawerLabel: 'Audit' }}
-      />
-      <Drawer.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ drawerLabel: 'Profile' }}
-      />
-      <Drawer.Screen
-        name="ChangePassword"
-        component={ChangePasswordScreen}
-        options={{ drawerLabel: 'Đổi mật khẩu', drawerItemStyle: { display: 'none' } }}
-      />
-      <Drawer.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{ drawerLabel: 'Cài đặt' }}
-      />
-    </Drawer.Navigator>
+      <AdminTab.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <AdminTab.Screen name="AdminUsers" component={AdminUsersScreen} />
+      <AdminTab.Screen name="AdminReports" component={AdminReportsScreen} />
+      <AdminTab.Screen name="AdminSettings" component={AdminSettingsScreen} />
+      <AdminTab.Screen name="AdminAudit" component={AdminAuditScreen} options={{ tabBarButton: () => null }} />
+      <AdminTab.Screen name="Profile" component={ProfileScreen} />
+      <AdminTab.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ tabBarButton: () => null }} />
+      <AdminTab.Screen name="Settings" component={SettingsScreen} options={{ tabBarButton: () => null }} />
+    </AdminTab.Navigator>
   );
 }
 
 export default function AppNavigator({ userRole, isLoading }: AppNavigatorProps) {
-  // Force re-render when userRole changes
   const navigationRef = React.useRef<any>(null);
 
   React.useEffect(() => {
     if (!isLoading && userRole && navigationRef.current) {
-      // Reset navigation stack when user logs in
       const routeName =
         userRole === UserRole.Employee ? 'EmployeeTabs' :
           userRole === UserRole.Manager ? 'ManagerDrawer' :
-            userRole === UserRole.Admin ? 'AdminDrawer' :
+            userRole === UserRole.Admin ? 'AdminTabs' :
               'Login';
 
       navigationRef.current.reset({
@@ -254,7 +186,6 @@ export default function AppNavigator({ userRole, isLoading }: AppNavigatorProps)
         routes: [{ name: routeName }],
       });
     } else if (!isLoading && !userRole && navigationRef.current) {
-      // Reset to Login when user logs out
       navigationRef.current.reset({
         index: 0,
         routes: [{ name: 'Login' }],
@@ -272,7 +203,7 @@ export default function AppNavigator({ userRole, isLoading }: AppNavigatorProps)
       case UserRole.Manager:
         return 'ManagerDrawer';
       case UserRole.Admin:
-        return 'AdminDrawer';
+        return 'AdminTabs';
       default:
         return 'Login';
     }
@@ -290,8 +221,8 @@ export default function AppNavigator({ userRole, isLoading }: AppNavigatorProps)
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="EmployeeTabs" component={EmployeeTabNavigator} />
-        <Stack.Screen name="ManagerDrawer" component={ManagerDrawerNavigator} />
-        <Stack.Screen name="AdminDrawer" component={AdminDrawerNavigator} />
+        <Stack.Screen name="ManagerDrawer" component={ManagerTabNavigator} />
+        <Stack.Screen name="AdminTabs" component={AdminTabNavigator} />
         <Stack.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Attendance" component={AttendanceScreen} />
@@ -301,4 +232,3 @@ export default function AppNavigator({ userRole, isLoading }: AppNavigatorProps)
     </NavigationContainer>
   );
 }
-

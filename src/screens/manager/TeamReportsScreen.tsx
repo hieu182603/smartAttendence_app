@@ -10,13 +10,13 @@ import {
 } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { ManagerDrawerParamList } from '../../navigation/AppNavigator';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { ManagerTabParamList } from '../../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
 import { useManagerReports } from '../../hooks/useManagerQueries';
 
-type TeamReportsScreenNavigationProp = DrawerNavigationProp<ManagerDrawerParamList, 'TeamReports'>;
+type TeamReportsScreenNavigationProp = BottomTabNavigationProp<ManagerTabParamList, 'TeamReports'>;
 
 interface TeamReportsScreenProps {
     navigation: TeamReportsScreenNavigationProp;
@@ -96,9 +96,7 @@ export default function TeamReportsScreen({ navigation }: TeamReportsScreenProps
                 end={{ x: 1, y: 1 }}
                 style={styles.header}
             >
-                <TouchableOpacity onPress={() => navigation.openDrawer()} style={{ padding: SPACING.xs }}>
-                    <Icon name="menu" size={24} color="#ffffff" />
-                </TouchableOpacity>
+                <View style={{ width: 24 }} />
                 <Text style={styles.headerTitle}>Báo cáo công</Text>
                 <View style={{ width: 24 }} />
             </LinearGradient>
