@@ -51,8 +51,6 @@ export function CustomBottomTabBar({ state, descriptors, navigation }: BottomTab
               const handleCreateLeave = () => {
                 // Navigate to Leaves tab (which shows RequestsScreen) and open modal
                 navigation.navigate('Leaves' as any, { openCreateModal: true } as any);
-                // Also navigate to Requests tab as fallback
-                navigation.navigate('Requests' as any, { openCreateModal: true } as any);
               };
 
               return (

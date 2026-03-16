@@ -1,37 +1,57 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
+import { useAdminStats } from '../../hooks/useAdminQueries';
+import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
 export default function AdminReportsScreen() {
   const theme = useTheme();
+  const navigation = useNavigation();
   const [selectedPeriod, setSelectedPeriod] = useState('Weekly');
+  const { data: statsData, isLoading } = useAdminStats();
+
+  const totalEmployees = statsData?.kpi?.totalEmployees || 0;
+  const presentToday = statsData?.kpi?.presentToday || 0;
+  const lateToday = statsData?.kpi?.lateToday || 0;
+  const absentToday = statsData?.kpi?.absentToday || 0;
+
+  const attendanceRate = totalEmployees > 0 ? ((presentToday + lateToday) / totalEmployees * 100).toFixed(1) : '0.0';
 
   const stats = [
-    { label: 'Tỉ lệ đi làm', value: '94.2%', icon: 'trending_up', color: '#0bda68' },
-    { label: 'Giờ làm tb', value: '7.8h', icon: 'schedule', color: '#4245f0' },
-    { label: 'Số người muộn', value: '12', icon: 'timelapse', color: '#ef4444' },
+    { label: 'Tỉ lệ đi làm', value: `${attendanceRate}%`, icon: 'trending_up', color: '#0bda68' },
+    { label: 'Số người muộn', value: `${lateToday}`, icon: 'timelapse', color: '#f59e0b' },
+    { label: 'Số người vắng', value: `${absentToday}`, icon: 'person_off', color: '#ef4444' },
   ];
 
-  const chartData = [
-    { day: 'T2', value: 85 },
-    { day: 'T3', value: 92 },
-    { day: 'T4', value: 88 },
-    { day: 'T5', value: 95 },
-    { day: 'T6', value: 82 },
-    { day: 'T7', value: 45 },
-    { day: 'CN', value: 40 },
-  ];
+  // Map attendance data to chart max value 100 for percentage
+  const chartData = (statsData?.attendanceData || []).map((item: any) => {
+    const totalDay = item.present + item.late + item.absent;
+    const rate = totalDay > 0 ? ((item.present + item.late) / totalDay) * 100 : 0;
+    return {
+      day: item.date,
+      value: rate
+    };
+  });
 
+  // Keep these dummy or navigate to other specific report modules if existed.
   const reportTypes = [
     { id: 1, title: 'Báo cáo điểm danh', subtitle: 'Chi tiết check-in/out hằng ngày', icon: 'assignment' },
     { id: 2, title: 'Tổng hợp bảng lương', subtitle: 'Thống kê giờ làm và tăng ca', icon: 'credit_card' },
     { id: 3, title: 'Năng suất phòng ban', subtitle: 'Hiệu quả theo từng phòng ban', icon: 'business' },
     { id: 4, title: 'Kiểm tra bảo mật', subtitle: 'Nhật ký truy cập và thay đổi', icon: 'security' },
   ];
+
+  if (isLoading) {
+    return (
+      <View style={[globalStyles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[globalStyles.container, { backgroundColor: theme.background }]}>
@@ -43,9 +63,14 @@ export default function AdminReportsScreen() {
         style={styles.headerGradient}
       >
         <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.headerTitle}>Báo cáo & Phân tích</Text>
-            <Text style={styles.headerSubtitle}>Dữ liệu hệ thống thời gian thực</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingRight: SPACING.md }}>
+              <Icon name="arrow_back" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.headerTitle}>Báo cáo & Phân tích</Text>
+              <Text style={styles.headerSubtitle}>Dữ liệu hệ thống thời gian thực</Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.actionBtn}>
             <Icon name="more_vert" size={24} color="#fff" />
@@ -54,7 +79,7 @@ export default function AdminReportsScreen() {
 
         <View style={styles.periodSelectorWrapper}>
           <View style={[styles.periodSelector, { backgroundColor: theme.surfaceDarker }]}>
-            {['Daily', 'Weekly', 'Monthly'].map((period) => (
+            {['Weekly'].map((period) => (
               <TouchableOpacity
                 key={period}
                 onPress={() => setSelectedPeriod(period)}
@@ -68,7 +93,7 @@ export default function AdminReportsScreen() {
                   { color: theme.text.muted },
                   selectedPeriod === period && styles.periodTextActive
                 ]}>
-                  {period === 'Daily' ? 'Ngày' : period === 'Weekly' ? 'Tuần' : 'Tháng'}
+                  {period === 'Weekly' ? '7 Ngày Qua' : period}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -96,19 +121,19 @@ export default function AdminReportsScreen() {
         {/* Attendance Chart */}
         <View style={[styles.chartCard, { backgroundColor: theme.surface, borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }]}>
           <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, { color: theme.text.primary }]}>Xu hướng điểm danh</Text>
+            <Text style={[styles.cardTitle, { color: theme.text.primary }]}>Tỉ lệ đi làm 7 Ngày Qua (%)</Text>
             <Icon name="trending_up" size={18} color="#0bda68" />
           </View>
 
           <View style={styles.chartArea}>
-            {chartData.map((item, index) => (
+            {chartData.length > 0 ? chartData.map((item: any, index: number) => (
               <View key={index} style={styles.barContainer}>
                 <View style={[styles.barBg, { backgroundColor: theme.surfaceDarker }]}>
                   <View
                     style={[
                       styles.barFill,
                       {
-                        height: `${item.value}%`,
+                        height: `${Math.max(item.value, 5)}%`, // At least 5% to show something
                         backgroundColor: item.value > 80 ? COLORS.primary : COLORS.accent.purple
                       }
                     ]}
@@ -121,7 +146,9 @@ export default function AdminReportsScreen() {
                 </View>
                 <Text style={[styles.barLabel, { color: theme.text.muted }]}>{item.day}</Text>
               </View>
-            ))}
+            )) : (
+              <Text style={{ color: theme.text.muted, alignSelf: 'center', flex: 1, textAlign: 'center' }}>Chưa có dữ liệu</Text>
+            )}
           </View>
         </View>
 

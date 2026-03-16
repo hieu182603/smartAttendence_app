@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { AdminService } from '../services/admin.service';
 import { queryKeys } from './queryKeys';
 
@@ -39,6 +39,17 @@ export function useUsers(params?: { role?: string; status?: string; search?: str
     return useQuery({
         queryKey: queryKeys.admin.users(params),
         queryFn: () => AdminService.getUsers(params),
+    });
+}
+
+/**
+ * Hook to fetch audit logs with optional filters
+ */
+export function useAuditLogs(params?: { page?: number; limit?: number; search?: string; action?: string; status?: string; category?: string; userId?: string; startDate?: string; endDate?: string }) {
+    return useQuery({
+        queryKey: ['admin', 'logs', params],
+        queryFn: () => AdminService.getLogs(params),
+        placeholderData: keepPreviousData,
     });
 }
 

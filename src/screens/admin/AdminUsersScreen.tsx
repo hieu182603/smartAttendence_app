@@ -48,7 +48,12 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
         role: selectedFilter === 'all' ? undefined : selectedFilter,
         search: searchQuery || undefined,
       });
-      setUsers(data || []);
+      // Map backend isActive boolean to frontend status string
+      const mapped = (data || []).map((u: any) => ({
+        ...u,
+        status: u.isActive !== undefined ? (u.isActive ? 'active' : 'inactive') : (u.status || 'active'),
+      }));
+      setUsers(mapped);
     } catch (error) {
       console.log('Error fetching users', error);
       setUsers([]);
@@ -375,7 +380,7 @@ export default function AdminUsersScreen({ navigation }: AdminUsersScreenProps) 
                             fontSize: 11,
                           }}
                         >
-                          {user.status === 'active' ? 'Hoạt động' : 'Tạm ngưng'} {user.lastActive ? `• ${user.lastActive}` : ''}
+                          {user.status === 'active' ? 'Hoạt động' : 'Không hoạt động'} {user.lastActive ? `• ${user.lastActive}` : ''}
                         </Text>
                       </View>
                     </View>

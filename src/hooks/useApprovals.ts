@@ -49,7 +49,7 @@ export function useApprovals(): UseApprovalsReturn {
   const approve = useCallback(async (id: string, note?: string) => {
     try {
       const { ManagerService } = await import('../services/manager.service');
-      await ManagerService.approveRequest(id, { reason: note });
+      await ManagerService.approveRequest(id, { comments: note });
       setApprovals(prev => prev.filter(a => a.id !== id));
     } catch (err) {
       console.error('Error approving request:', err);
@@ -60,7 +60,7 @@ export function useApprovals(): UseApprovalsReturn {
   const reject = useCallback(async (id: string, note: string) => {
     try {
       const { ManagerService } = await import('../services/manager.service');
-      await ManagerService.rejectRequest(id, { reason: note });
+      await ManagerService.rejectRequest(id, { comments: note });
       setApprovals(prev => prev.filter(a => a.id !== id));
     } catch (err) {
       console.error('Error rejecting request:', err);

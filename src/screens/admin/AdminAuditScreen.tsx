@@ -1,81 +1,72 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Modal, Pressable } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS, useTheme } from '../../utils/styles';
 import { Icon } from '../../components/Icon';
+import { useAuditLogs } from '../../hooks/useAdminQueries';
+import { useNavigation } from '@react-navigation/native';
+import { formatDistanceToNow } from 'date-fns';
+import { vi as viLocale } from 'date-fns/locale';
 
 export default function AdminAuditScreen() {
   const theme = useTheme();
+  const navigation = useNavigation();
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [page, setPage] = useState(1);
 
-  const filters = ['All', 'Security', 'User', 'Attendance', 'System'];
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  const auditLogs = [
-    {
-      id: 1,
-      action: 'Đăng nhập hệ thống',
-      user: 'Admin (hieu182603)',
-      time: '10:45 AM, Hôm nay',
-      type: 'Security',
-      status: 'success',
-      icon: 'login',
-      details: 'Đăng nhập thành công từ địa chỉ IP 192.168.1.1 (Chrome trên Windows 11)',
-    },
-    {
-      id: 2,
-      action: 'Tạo phòng ban mới',
-      user: 'Manager (Lan Anh)',
-      time: '09:30 AM, Hôm nay',
-      type: 'User',
-      status: 'success',
-      icon: 'business',
-      details: 'Đã thêm phòng ban "Marketing & Sales" vào hệ thống',
-    },
-    {
-      id: 3,
-      action: 'Truy cập bị từ chối',
-      user: 'Unknown User',
-      time: '08:15 AM, Hôm qua',
-      type: 'Security',
-      status: 'error',
-      icon: 'gpp_bad',
-      details: 'Phát hiện truy cập trái phép vào trang Cài đặt Hệ thống',
-    },
-    {
-      id: 4,
-      action: 'Cập nhật Ca làm việc',
-      user: 'Admin (hieu182603)',
-      time: '04:00 PM, Hôm qua',
-      type: 'Attendance',
-      status: 'info',
-      icon: 'restore',
-      details: 'Đã thay đổi giờ bắt đầu ca sáng cho nhân viên Nguyễn Văn A',
-    },
-    {
-      id: 5,
-      action: 'Bảo trì hệ thống',
-      user: 'System',
-      time: '02:00 AM, 12/03',
-      type: 'System',
-      status: 'info',
-      icon: 'settings',
-      details: 'Tự động dọn dẹp bộ nhớ đệm và tối ưu hóa cơ sở dữ liệu định kỳ',
-    },
-  ];
+  const filters = ['All', 'auth', 'attendance', 'request', 'user', 'system', 'settings'];
 
-  const filteredLogs = auditLogs.filter(log => {
-    const matchesFilter = activeFilter === 'All' || log.type === activeFilter;
-    const matchesSearch = log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  const { data, isLoading, refetch } = useAuditLogs({
+    page,
+    limit: 50,
+    search: debouncedSearch || undefined,
+    category: activeFilter === 'All' ? undefined : activeFilter,
+  }) as { data: { logs: any[]; pagination: { total: number; page: number; totalPages: number; limit: number } } | undefined, isLoading: boolean, refetch: any };
+
+  const auditLogs = data?.logs || [];
+  const totalLogs = data?.pagination?.total || 0;
 
   const handleSelectFilter = (filter: string) => {
     setActiveFilter(filter);
     setShowFilterModal(false);
+    setPage(1); // Reset page on filter change
+  };
+
+  const mapCategoryToIcon = (category: string) => {
+    switch (category) {
+      case 'auth': return 'security';
+      case 'attendance': return 'schedule';
+      case 'request': return 'assignment';
+      case 'user': return 'group';
+      case 'system': return 'settings_applications';
+      case 'settings': return 'settings';
+      default: return 'history';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === 'success') return '#0bda68';
+    if (status === 'failed') return '#ef4444';
+    if (status === 'warning') return '#f59e0b';
+    return '#4245f0'; // info
+  };
+
+  const getStatusBgColor = (status: string) => {
+    if (status === 'success') return 'rgba(11, 218, 104, 0.1)';
+    if (status === 'failed') return 'rgba(239, 68, 68, 0.1)';
+    if (status === 'warning') return 'rgba(245, 158, 11, 0.1)';
+    return 'rgba(66, 69, 240, 0.1)';
   };
 
   return (
@@ -88,9 +79,14 @@ export default function AdminAuditScreen() {
         style={styles.headerGradient}
       >
         <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.headerTitle}>Nhật ký hệ thống</Text>
-            <Text style={styles.headerSubtitle}>Lịch sử hoạt động và thay đổi</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingRight: SPACING.md }}>
+              <Icon name="arrow_back" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.headerTitle}>Nhật ký hệ thống</Text>
+              <Text style={styles.headerSubtitle}>Lịch sử hoạt động và thay đổi</Text>
+            </View>
           </View>
           <TouchableOpacity
             style={[styles.filterBtn, { backgroundColor: activeFilter !== 'All' ? '#ffffff20' : 'rgba(255, 255, 255, 0.1)' }]}
@@ -108,7 +104,7 @@ export default function AdminAuditScreen() {
             <Icon name="search" size={20} color={theme.text.muted} />
             <TextInput
               style={[styles.searchInput, { color: theme.text.primary }]}
-              placeholder="Tìm hành động, chi tiết..."
+              placeholder="Tìm hành động, chi tiết, người dùng..."
               placeholderTextColor={theme.text.muted}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -131,53 +127,54 @@ export default function AdminAuditScreen() {
           <Text style={[styles.listTitle, { color: theme.text.secondary }]}>
             {activeFilter === 'All' ? 'Tất cả nhật ký' : `Nhật ký: ${activeFilter}`}
           </Text>
-          <Text style={[styles.logCount, { color: theme.text.muted }]}>{filteredLogs.length} kết quả</Text>
+          {isLoading ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : (
+            <Text style={[styles.logCount, { color: theme.text.muted }]}>{totalLogs} kết quả</Text>
+          )}
         </View>
 
-        {filteredLogs.map((log) => (
-          <View key={log.id} style={[styles.logCard, { backgroundColor: theme.surface, borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }]}>
-            <View style={styles.logMain}>
-              <View style={[
-                styles.iconWrap,
-                {
-                  backgroundColor: log.status === 'success' ? 'rgba(11, 218, 104, 0.1)' :
-                    log.status === 'error' ? 'rgba(239, 68, 68, 0.1)' :
-                      'rgba(66, 69, 240, 0.1)'
-                }
-              ]}>
-                <Icon
-                  name={log.icon as any}
-                  size={20}
-                  color={log.status === 'success' ? '#0bda68' :
-                    log.status === 'error' ? '#ef4444' :
-                      '#4245f0'}
-                />
-              </View>
-
-              <View style={styles.logInfo}>
-                <View style={styles.logTopRow}>
-                  <Text style={[styles.logActionText, { color: theme.text.primary }]}>{log.action}</Text>
-                  <View style={[styles.typeBadge, { backgroundColor: theme.surfaceDarker }]}>
-                    <Text style={[styles.typeBadgeText, { color: theme.text.secondary }]}>{log.type}</Text>
-                  </View>
+        {auditLogs.map((log: any) => {
+          const timeAgo = formatDistanceToNow(new Date(log.timestamp), { addSuffix: true, locale: viLocale });
+          return (
+            <View key={log.id} style={[styles.logCard, { backgroundColor: theme.surface, borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }]}>
+              <View style={styles.logMain}>
+                <View style={[
+                  styles.iconWrap,
+                  { backgroundColor: getStatusBgColor(log.status) }
+                ]}>
+                  <Icon
+                    name={mapCategoryToIcon(log.category)}
+                    size={20}
+                    color={getStatusColor(log.status)}
+                  />
                 </View>
-                <Text style={[styles.logTimeText, { color: theme.text.muted }]}>{log.time}</Text>
+
+                <View style={styles.logInfo}>
+                  <View style={styles.logTopRow}>
+                    <Text style={[styles.logActionText, { color: theme.text.primary }]} numberOfLines={1}>{log.description}</Text>
+                    <View style={[styles.typeBadge, { backgroundColor: theme.surfaceDarker }]}>
+                      <Text style={[styles.typeBadgeText, { color: theme.text.secondary }]}>{log.category}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.logTimeText, { color: theme.text.muted }]}>{timeAgo} ({log.timestamp})</Text>
+                </View>
+              </View>
+
+              <View style={styles.logDivider} />
+
+              <View style={styles.logBottom}>
+                <View style={styles.userRow}>
+                  <Icon name="person" size={14} color={theme.text.secondary} />
+                  <Text style={[styles.userLabel, { color: theme.text.secondary }]}>{log.userName} ({log.userRole})</Text>
+                </View>
+                <Text style={[styles.logDetailText, { color: theme.text.primary }]}>IP: {log.ipAddress} | Hành động gốc: {log.action}</Text>
               </View>
             </View>
+          );
+        })}
 
-            <View style={styles.logDivider} />
-
-            <View style={styles.logBottom}>
-              <View style={styles.userRow}>
-                <Icon name="person" size={14} color={theme.text.secondary} />
-                <Text style={[styles.userLabel, { color: theme.text.secondary }]}>{log.user}</Text>
-              </View>
-              <Text style={[styles.logDetailText, { color: theme.text.primary }]}>{log.details}</Text>
-            </View>
-          </View>
-        ))}
-
-        {filteredLogs.length === 0 && (
+        {!isLoading && auditLogs.length === 0 && (
           <View style={styles.emptyWrap}>
             <Icon name="history_toggle_off" size={60} color={theme.text.muted} />
             <Text style={[styles.emptyLabel, { color: theme.text.muted }]}>Không tìm thấy kết quả nào</Text>

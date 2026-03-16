@@ -73,6 +73,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
                     // Other errors (network etc.) → keep cached user for now
                 }
+            } else if (storedToken && !storedUser) {
+                // Orphaned token: token exists but user data is missing
+                // Clean up the orphaned token to avoid broken state on restart
+                console.log('[Auth] Orphaned token found (no user data), clearing');
+                await AsyncStorage.removeItem(TOKEN_KEY);
+                setToken(null);
+                setUser(null);
             }
         } catch (e) {
             console.log('Auth check error', e);
@@ -94,12 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setToken(token);
             setUser(user);
 
-            await AsyncStorage.setItem(TOKEN_KEY, token);
             if (rememberMe) {
-                // Persist user data to survive app restart
+                // Persist both token and user data to survive app restart
+                await AsyncStorage.setItem(TOKEN_KEY, token);
                 await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
             } else {
-                // Don't persist user — they'll need to re-login after app restart
+                // Don't persist — fully logged out on app restart
+                await AsyncStorage.removeItem(TOKEN_KEY);
                 await AsyncStorage.removeItem(USER_KEY);
             }
 

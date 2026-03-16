@@ -56,6 +56,7 @@ const iconMap: { [key: string]: { family: string; name: string } } = {
   info: { family: 'Ionicons', name: 'information-circle' },
   gpp_bad: { family: 'MaterialIcons', name: 'gpp-bad' },
   restore: { family: 'MaterialIcons', name: 'restore' },
+  refresh: { family: 'Ionicons', name: 'refresh' },
 
   // Business
   business: { family: 'Ionicons', name: 'business' },
