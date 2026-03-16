@@ -5,6 +5,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { globalStyles, COLORS, useTheme } from '../utils/styles';
 
+// Import icon image
+const appIcon = require('../../assets/icon.png');
+
 type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Splash'>;
 
 interface SplashScreenProps {
@@ -104,9 +107,12 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
           ]}
         >
           <Image
-            source={require('../../assets/icon.png')}
+            source={appIcon}
             style={{ width: 90, height: 90, borderRadius: 20 }}
-            resizeMode="cover"
+            resizeMode="contain"
+            onError={(error) => {
+              console.warn('Failed to load app icon:', error);
+            }}
           />
         </Animated.View>
 

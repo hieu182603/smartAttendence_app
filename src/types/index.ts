@@ -1,7 +1,11 @@
 export enum UserRole {
   Employee = 'EMPLOYEE',
   Manager = 'MANAGER',
-  Admin = 'ADMIN'
+  Admin = 'ADMIN',
+  SuperAdmin = 'SUPER_ADMIN',
+  HRManager = 'HR_MANAGER',
+  Supervisor = 'SUPERVISOR',
+  Trial = 'TRIAL'
 }
 
 export enum Screen {

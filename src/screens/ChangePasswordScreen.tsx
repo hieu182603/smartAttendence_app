@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
 import { Icon } from '../components/Icon';
+import api from '../libs/axios';
 
 export default function ChangePasswordScreen() {
     const navigation = useNavigation();
@@ -79,12 +80,17 @@ export default function ChangePasswordScreen() {
 
         setIsLoading(true);
 
-        // Simulate API call
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            await api.post('/users/change-password', {
+                currentPassword: currentPassword.trim(),
+                newPassword: newPassword.trim(),
+            });
             setSuccess(true);
-        } catch (err) {
-            setError('Có lỗi xảy ra. Vui lòng thử lại.');
+        } catch (err: any) {
+            const message =
+                err?.response?.data?.message ||
+                'Có lỗi xảy ra. Vui lòng thử lại.';
+            setError(message);
         } finally {
             setIsLoading(false);
         }

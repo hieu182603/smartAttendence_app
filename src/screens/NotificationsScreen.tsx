@@ -27,9 +27,42 @@ export default function NotificationsScreen() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
+  // Added logging for debugging
+  console.log('[NotificationsScreen] rendering');
+
   const mapNotification = (item: any): Notification => {
     const createdDate = item.createdAt ? new Date(item.createdAt) : new Date();
     const isValid = !isNaN(createdDate.getTime());
+
+    const getIcon = (type: string) => {
+      switch (type) {
+        case 'request_approved':
+        case 'approved':
+        case 'success':
+        case 'attendance_updated':
+          return 'check-circle';
+        case 'request_rejected':
+        case 'rejected':
+        case 'error':
+          return 'cancel';
+        case 'request_created':
+        case 'attendance_request':
+          return 'assignment';
+        case 'attendance_late':
+        case 'attendance_early':
+        case 'warning':
+          return 'warning';
+        case 'info':
+        case 'system':
+          return 'info';
+        case 'shift_assigned':
+        case 'shift_updated':
+          return 'schedule';
+        default:
+          return 'notifications';
+      }
+    };
+
     return {
       id: item._id,
       type: item.type,
@@ -38,9 +71,7 @@ export default function NotificationsScreen() {
       time: isValid ? createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--',
       timestamp: isValid ? createdDate.getTime() : 0,
       unread: !item.isRead,
-      icon: item.type === 'approved' || item.type === 'request_approved' ? 'check_circle' :
-        item.type === 'rejected' || item.type === 'request_rejected' ? 'cancel' :
-          item.type === 'reminder' ? 'alarm' : 'info',
+      icon: getIcon(item.type),
     };
   };
 

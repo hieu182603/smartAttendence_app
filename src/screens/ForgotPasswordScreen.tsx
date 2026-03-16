@@ -16,6 +16,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { globalStyles, COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../utils/styles';
 import { Icon } from '../components/Icon';
+import api from '../libs/axios';
 
 type ForgotPasswordScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ForgotPassword'>;
 
@@ -77,12 +78,14 @@ export default function ForgotPasswordScreen({ navigation }: ForgotPasswordScree
 
         setIsLoading(true);
 
-        // Simulate API call
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            await api.post('/auth/forgot-password', { email: email.trim() });
             setSuccess(true);
-        } catch (err) {
-            setError('Có lỗi xảy ra. Vui lòng thử lại.');
+        } catch (err: any) {
+            const message =
+                err?.response?.data?.message ||
+                'Có lỗi xảy ra. Vui lòng thử lại.';
+            setError(message);
         } finally {
             setIsLoading(false);
         }
