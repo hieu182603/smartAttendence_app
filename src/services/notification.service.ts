@@ -3,6 +3,7 @@ import api from '../libs/axios';
 export const NotificationService = {
     getAll: async (params: { page?: number; limit?: number; unreadOnly?: boolean } = {}) => {
         const response = await api.get('/notifications', { params });
+        console.log('[NotificationService] getAll response:', JSON.stringify(response.data).substring(0, 200));
         return response.data;
     },
 

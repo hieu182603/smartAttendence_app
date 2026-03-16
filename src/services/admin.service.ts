@@ -60,9 +60,15 @@ export const AdminService = {
         return response.data.users || response.data;
     },
 
+    // Audit Logs
+    getLogs: async (params?: { page?: number; limit?: number; search?: string; action?: string; status?: string; category?: string; userId?: string; startDate?: string; endDate?: string }) => {
+        const response = await api.get('/logs', { params });
+        return response.data as { logs: any[]; pagination: { total: number; page: number; totalPages: number; limit: number } };
+    },
+
     // Dashboard Stats
     getDashboardStats: async () => {
-        const response = await api.get('/admin/stats');
+        const response = await api.get('/dashboard/stats');
         return response.data;
     },
 
